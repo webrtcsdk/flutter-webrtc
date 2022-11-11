@@ -10,8 +10,7 @@
     // this method is called
     RTCAudioSessionConfiguration *config = [RTCAudioSessionConfiguration webRTCConfiguration];
     // require audio session to be either PlayAndRecord or MultiRoute
-    if (recording && session.category != AVAudioSessionCategoryPlayAndRecord &&
-        session.category != AVAudioSessionCategoryMultiRoute) {
+    if (recording) {
         config.category = AVAudioSessionCategoryPlayAndRecord;
         config.categoryOptions = AVAudioSessionCategoryOptionAllowBluetooth |
         AVAudioSessionCategoryOptionAllowBluetoothA2DP;
