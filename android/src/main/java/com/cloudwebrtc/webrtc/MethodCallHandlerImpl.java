@@ -157,8 +157,8 @@ public class MethodCallHandlerImpl implements MethodCallHandler, StateProvider {
     getUserMediaImpl = new GetUserMediaImpl(this, context);
 
     audioDeviceModule = JavaAudioDeviceModule.builder(context)
-            .setUseHardwareAcousticEchoCanceler(true)
-            .setUseHardwareNoiseSuppressor(true)
+            .setUseHardwareAcousticEchoCanceler(false)
+            .setUseHardwareNoiseSuppressor(false)
             .setSamplesReadyCallback(getUserMediaImpl.inputSamplesInterceptor)
             .createAudioDeviceModule();
 
