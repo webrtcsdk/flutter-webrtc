@@ -84,6 +84,9 @@ import io.flutter.plugin.common.MethodChannel.Result;
 import io.flutter.view.TextureRegistry;
 import io.flutter.view.TextureRegistry.SurfaceTextureEntry;
 
+import org.webrtc.voiceengine.WebRtcAudioManager;
+import org.webrtc.voiceengine.WebRtcAudioUtils;
+
 public class MethodCallHandlerImpl implements MethodCallHandler, StateProvider {
   static public final String TAG = "FlutterWebRTCPlugin";
 
@@ -161,6 +164,9 @@ public class MethodCallHandlerImpl implements MethodCallHandler, StateProvider {
             .setUseHardwareNoiseSuppressor(false)
             .setSamplesReadyCallback(getUserMediaImpl.inputSamplesInterceptor)
             .createAudioDeviceModule();
+
+    WebRtcAudioUtils.setWebRtcBasedAcousticEchoCanceler(true);
+    WebRtcAudioUtils.setWebRtcBasedNoiseSuppressor(true);
 
     getUserMediaImpl.audioDeviceModule = (JavaAudioDeviceModule) audioDeviceModule;
 
