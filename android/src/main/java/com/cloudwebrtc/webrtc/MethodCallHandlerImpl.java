@@ -165,6 +165,7 @@ public class MethodCallHandlerImpl implements MethodCallHandler, StateProvider {
             .setSamplesReadyCallback(getUserMediaImpl.inputSamplesInterceptor)
             .createAudioDeviceModule();
 
+    WebRtcAudioManager.setBlacklistDeviceForOpenSLESUsage(true);
     WebRtcAudioUtils.setWebRtcBasedAcousticEchoCanceler(true);
     WebRtcAudioUtils.setWebRtcBasedNoiseSuppressor(true);
 
