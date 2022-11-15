@@ -1087,7 +1087,7 @@ class GetUserMediaImpl {
     @RequiresApi(api = VERSION_CODES.M)
     void setPreferredInputDevice(int i) {
         android.media.AudioManager audioManager = ((android.media.AudioManager) applicationContext.getSystemService(Context.AUDIO_SERVICE));
-        audioManager.setMode(AudioManager.MODE_IN_COMMUNICATION);
+        audioManager.setMode(android.media.AudioManager.MODE_IN_COMMUNICATION);
         final AudioDeviceInfo[] devices = audioManager.getDevices(android.media.AudioManager.GET_DEVICES_INPUTS);
         if (devices.length > i) {
             audioDeviceModule.setPreferredInputDevice(devices[i]);
