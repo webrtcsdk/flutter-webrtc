@@ -222,15 +222,29 @@ class GetUserMediaImpl {
      *                         constraints for audio media type.
      */
     private void addDefaultAudioConstraints(MediaConstraints audioConstraints) {
-        audioConstraints.optional.add(
-                new MediaConstraints.KeyValuePair("googNoiseSuppression", "true"));
-        audioConstraints.optional.add(
-                new MediaConstraints.KeyValuePair("googEchoCancellation", "true"));
-        audioConstraints.optional.add(new MediaConstraints.KeyValuePair("echoCancellation", "true"));
-        audioConstraints.optional.add(
-                new MediaConstraints.KeyValuePair("googEchoCancellation2", "true"));
-        audioConstraints.optional.add(
-                new MediaConstraints.KeyValuePair("googDAEchoCancellation", "true"));
+        // audioConstraints.optional.add(
+        //         new MediaConstraints.KeyValuePair("googNoiseSuppression", "true"));
+        // audioConstraints.optional.add(
+        //         new MediaConstraints.KeyValuePair("googEchoCancellation", "true"));
+        // audioConstraints.optional.add(new MediaConstraints.KeyValuePair("echoCancellation", "true"));
+        // audioConstraints.optional.add(
+        //         new MediaConstraints.KeyValuePair("googEchoCancellation2", "true"));
+        // audioConstraints.optional.add(
+        //         new MediaConstraints.KeyValuePair("googDAEchoCancellation", "true"));
+        audioConstraints.optional.add(new MediaConstraints.KeyValuePair("googEchoCancellation", "true"));
+        audioConstraints.optional.add(new MediaConstraints.KeyValuePair("googEchoCancellation2", "true"));
+        audioConstraints.optional.add(new MediaConstraints.KeyValuePair("googDAEchoCancellation", "true"));
+
+        audioConstraints.optional.add(new MediaConstraints.KeyValuePair("googTypingNoiseDetection", "true"));
+
+        audioConstraints.optional.add(new MediaConstraints.KeyValuePair("googAutoGainControl", "true"));
+        audioConstraints.mandatory.add(new MediaConstraints.KeyValuePair("googAutoGainControl2", "true"));
+
+        audioConstraints.optional.add(new MediaConstraints.KeyValuePair("googNoiseSuppression", "true"));
+        audioConstraints.optional.add(new MediaConstraints.KeyValuePair("googNoiseSuppression2", "true"));
+
+        audioConstraints.optional.add(new MediaConstraints.KeyValuePair("googAudioMirroring", "false"));
+        audioConstraints.optional.add(new MediaConstraints.KeyValuePair("googHighpassFilter", "true"));
     }
 
     /**
@@ -1073,6 +1087,7 @@ class GetUserMediaImpl {
     @RequiresApi(api = VERSION_CODES.M)
     void setPreferredInputDevice(int i) {
         android.media.AudioManager audioManager = ((android.media.AudioManager) applicationContext.getSystemService(Context.AUDIO_SERVICE));
+        audioManager.setMode(AudioManager.MODE_IN_COMMUNICATION);
         final AudioDeviceInfo[] devices = audioManager.getDevices(android.media.AudioManager.GET_DEVICES_INPUTS);
         if (devices.length > i) {
             audioDeviceModule.setPreferredInputDevice(devices[i]);
