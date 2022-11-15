@@ -159,16 +159,21 @@ public class MethodCallHandlerImpl implements MethodCallHandler, StateProvider {
 
     getUserMediaImpl = new GetUserMediaImpl(this, context);
 
+    Boolean isDeviceSupportHWAEC = JavaAudioDeviceModule.isBuiltInAcousticEchoCancelerSupported();
+    Boolean isDeviceSupportNoiseSuppressor = JavaAudioDeviceModule.isBuiltInNoiseSuppressorSupported();
+
     audioDeviceModule = JavaAudioDeviceModule.builder(context)
-            .setUseHardwareAcousticEchoCanceler(false)
-            .setUseHardwareNoiseSuppressor(false)
+            .setUseHardwareAcousticEchoCanceler(isDeviceSupportHWAEC && isDeviceSupportNoiseSuppressor)
+            .setUseHardwareNoiseSuppressor(isDeviceSupportHWAEC && isDeviceSupportNoiseSuppressor)
             .setSamplesReadyCallback(getUserMediaImpl.inputSamplesInterceptor)
             .createAudioDeviceModule();
 
-    WebRtcAudioUtils.setWebRtcBasedAcousticEchoCanceler(true);
-    WebRtcAudioUtils.setWebRtcBasedAutomaticGainControl(true);
-    WebRtcAudioUtils.setWebRtcBasedNoiseSuppressor(true);
-    WebRtcAudioManager.setBlacklistDeviceForOpenSLESUsage(true);
+    if (!isDeviceSupportHWAEC || !isDeviceSupportNoiseSuppressor) {
+      WebRtcAudioUtils.setWebRtcBasedAcousticEchoCanceler(true);
+      WebRtcAudioUtils.setWebRtcBasedAutomaticGainControl(true);
+      WebRtcAudioUtils.setWebRtcBasedNoiseSuppressor(true);
+      WebRtcAudioManager.setBlacklistDeviceForOpenSLESUsage(true);
+    }
 
     getUserMediaImpl.audioDeviceModule = (JavaAudioDeviceModule) audioDeviceModule;
 
