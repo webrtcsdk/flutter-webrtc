@@ -86,6 +86,7 @@ import io.flutter.view.TextureRegistry.SurfaceTextureEntry;
 
 import org.webrtc.voiceengine.WebRtcAudioManager;
 import org.webrtc.voiceengine.WebRtcAudioUtils;
+import org.webrtc.voiceengine.WebRtcAudioEffects;
 
 public class MethodCallHandlerImpl implements MethodCallHandler, StateProvider {
   static public final String TAG = "FlutterWebRTCPlugin";
@@ -159,21 +160,33 @@ public class MethodCallHandlerImpl implements MethodCallHandler, StateProvider {
 
     getUserMediaImpl = new GetUserMediaImpl(this, context);
 
-    Boolean isDeviceSupportHWAEC = JavaAudioDeviceModule.isBuiltInAcousticEchoCancelerSupported();
-    Boolean isDeviceSupportNoiseSuppressor = JavaAudioDeviceModule.isBuiltInNoiseSuppressorSupported();
+    /*
+     * Execute any time before creating a LocalAudioTrack and connecting
+     * to a Room.
+     */
+    Boolean isDeviceSupportHWAec = WebRtcAudioEffects.canUseAcousticEchoCanceler();
+    Boolean isDeviceSupportHWNs = WebRtcAudioEffects.canUseNoiseSuppressor();
 
     audioDeviceModule = JavaAudioDeviceModule.builder(context)
-            .setUseHardwareAcousticEchoCanceler(isDeviceSupportHWAEC && isDeviceSupportNoiseSuppressor)
-            .setUseHardwareNoiseSuppressor(isDeviceSupportHWAEC && isDeviceSupportNoiseSuppressor)
+            .setUseHardwareAcousticEchoCanceler(isDeviceSupportHWAec)
+            .setUseHardwareNoiseSuppressor(isDeviceSupportHWNs)
             .setSamplesReadyCallback(getUserMediaImpl.inputSamplesInterceptor)
             .createAudioDeviceModule();
 
-    if (!isDeviceSupportHWAEC || !isDeviceSupportNoiseSuppressor) {
+    if (!isDeviceSupportHWAec) {
       WebRtcAudioUtils.setWebRtcBasedAcousticEchoCanceler(true);
-      WebRtcAudioUtils.setWebRtcBasedAutomaticGainControl(true);
-      WebRtcAudioUtils.setWebRtcBasedNoiseSuppressor(true);
-      WebRtcAudioManager.setBlacklistDeviceForOpenSLESUsage(true);
     }
+
+    if (!isDeviceSupportHWNs) {
+      // Use software AEC
+      WebRtcAudioUtils.setWebRtcBasedNoiseSuppressor(true);
+    }
+
+    // Enable OpenSL ES
+    WebRtcAudioManager.setBlacklistDeviceForOpenSLESUsage(false);
+
+    // Use software AGC
+    WebRtcAudioUtils.setWebRtcBasedAutomaticGainControl(true);
 
     getUserMediaImpl.audioDeviceModule = (JavaAudioDeviceModule) audioDeviceModule;
 
