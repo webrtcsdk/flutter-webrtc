@@ -24,6 +24,25 @@
     AVAudioSessionPort _preferredInput;
 }
 
+static FlutterWebRTCPlugin *sharedSingleton;
+static NSString *sharedPeerConnectionId;
+
++ (FlutterWebRTCPlugin *)sharedSingleton
+{
+  @synchronized(self)
+  {
+    return sharedSingleton;
+  }
+}
+
++ (NSString *)sharedPeerConnectionId
+{
+  @synchronized(self)
+  {
+    return sharedPeerConnectionId;
+  }
+}
+
 @synthesize messenger = _messenger;
 @synthesize eventSink = _eventSink;
 @synthesize preferredInput = _preferredInput;
@@ -55,6 +74,7 @@
                    withTextures:(NSObject<FlutterTextureRegistry> *)textures{
 
     self = [super init];
+    sharedSingleton = self;
 
     FlutterEventChannel *eventChannel = [FlutterEventChannel eventChannelWithName:@"FlutterWebRTC.Event" 
                                               binaryMessenger:messenger];
@@ -162,6 +182,8 @@
 
         NSString *peerConnectionId = [[NSUUID UUID] UUIDString];
         peerConnection.flutterId  = peerConnectionId;
+        
+        sharedPeerConnectionId = peerConnectionId;
 
         /*Create Event Channel.*/
         peerConnection.eventChannel = [FlutterEventChannel
