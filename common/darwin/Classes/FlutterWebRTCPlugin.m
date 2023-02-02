@@ -1147,6 +1147,15 @@ static NSString *sharedPeerConnectionId;
   } else if ([@"getDesktopSourceThumbnail" isEqualToString:call.method]) {
     NSDictionary* argsMap = call.arguments;
     [self getDesktopSourceThumbnail:argsMap result:result];
+  } else if ([@"setCodecPreferences" isEqualToString:call.method]) {
+    NSDictionary* argsMap = call.arguments;
+    [self transceiverSetCodecPreferences:argsMap result:result];
+  }  else if ([@"getRtpReceiverCapabilities" isEqualToString:call.method]) {
+    NSDictionary* argsMap = call.arguments;
+    [self peerConnectionGetRtpReceiverCapabilities:argsMap result:result];
+  } else if ([@"getRtpSenderCapabilities" isEqualToString:call.method]) {
+    NSDictionary* argsMap = call.arguments;
+    [self peerConnectionGetRtpSenderCapabilities:argsMap result:result];
   } else {
     result(FlutterMethodNotImplemented);
   }
@@ -1476,8 +1485,8 @@ static NSString *sharedPeerConnectionId;
     BOOL srtpEnableEncryptedRtpHeaderExtensions = NO;
     BOOL srtpEnableAes128Sha1_32CryptoCipher = NO;
 
-    if (options[@"enableGcmCryptoSuites" != nil &&
-                [options[@"enableGcmCryptoSuites"] isKindOfClass:[NSNumber class]]]) {
+    if (options[@"enableGcmCryptoSuites"] != nil &&
+                [options[@"enableGcmCryptoSuites"] isKindOfClass:[NSNumber class]]) {
       NSNumber* value = options[@"enableGcmCryptoSuites"];
       srtpEnableGcmCryptoSuites = [value boolValue];
     }
