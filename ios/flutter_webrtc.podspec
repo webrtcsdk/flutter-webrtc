@@ -15,7 +15,7 @@ A new flutter plugin project.
   s.source_files = 'Classes/**/*'
   s.public_header_files = 'Classes/**/*.h'
   s.dependency 'Flutter'
-  s.dependency 'instrumentisto-libwebrtc-bin', '110.0.5481.77'
+  s.dependency 'instrumentisto-libwebrtc-bin', '108.0.5359.98'
   s.dependency 'libyuv-iOS'
   s.ios.deployment_target = '10.0'
   s.static_framework = true
