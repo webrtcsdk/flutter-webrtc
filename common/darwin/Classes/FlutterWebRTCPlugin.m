@@ -26,6 +26,25 @@
   AVAudioSessionPort _preferredInput;
 }
 
+static FlutterWebRTCPlugin *sharedSingleton;
+static NSString *sharedPeerConnectionId;
+
++ (FlutterWebRTCPlugin *)sharedSingleton
+{
+  @synchronized(self)
+  {
+    return sharedSingleton;
+  }
+}
+
++ (NSString *)sharedPeerConnectionId
+{
+  @synchronized(self)
+  {
+    return sharedPeerConnectionId;
+  }
+}
+
 @synthesize messenger = _messenger;
 @synthesize eventSink = _eventSink;
 @synthesize preferredInput = _preferredInput;
@@ -56,7 +75,8 @@
 #endif
                    withTextures:(NSObject<FlutterTextureRegistry>*)textures {
 
-  self = [super init];
+    self = [super init];
+    sharedSingleton = self;
 
   FlutterEventChannel* eventChannel =
       [FlutterEventChannel eventChannelWithName:@"FlutterWebRTC.Event" binaryMessenger:messenger];
@@ -78,12 +98,12 @@
   RTCDefaultVideoDecoderFactory* decoderFactory = [[RTCDefaultVideoDecoderFactory alloc] init];
   RTCDefaultVideoEncoderFactory* encoderFactory = [[RTCDefaultVideoEncoderFactory alloc] init];
 
-  RTCVideoEncoderFactorySimulcast* simulcastFactory =
-      [[RTCVideoEncoderFactorySimulcast alloc] initWithPrimary:encoderFactory
-                                                      fallback:encoderFactory];
+    // RTCVideoEncoderFactorySimulcast *simulcastFactory = [[RTCVideoEncoderFactorySimulcast alloc]  initWithPrimary:encoderFactory
+    //                                                                                                      fallback:encoderFactory];
 
-  _peerConnectionFactory = [[RTCPeerConnectionFactory alloc] initWithEncoderFactory:simulcastFactory
-                                                                     decoderFactory:decoderFactory];
+    _peerConnectionFactory = [[RTCPeerConnectionFactory alloc]
+                              initWithEncoderFactory:encoderFactory
+                              decoderFactory:decoderFactory];
 
   self.peerConnections = [NSMutableDictionary new];
   self.localStreams = [NSMutableDictionary new];
@@ -175,6 +195,8 @@
 
     NSString* peerConnectionId = [[NSUUID UUID] UUIDString];
     peerConnection.flutterId = peerConnectionId;
+
+    sharedPeerConnectionId = peerConnectionId;
 
     /*Create Event Channel.*/
     peerConnection.eventChannel = [FlutterEventChannel
@@ -1043,27 +1065,6 @@
     }
     [sender setTrack:track];
     result(nil);
-  } else if ([@"rtpSenderDispose" isEqualToString:call.method]) {
-    NSDictionary* argsMap = call.arguments;
-    NSString* peerConnectionId = argsMap[@"peerConnectionId"];
-    NSString* senderId = argsMap[@"rtpSenderId"];
-    RTCPeerConnection* peerConnection = self.peerConnections[peerConnectionId];
-    if (peerConnection == nil) {
-      result([FlutterError
-          errorWithCode:[NSString stringWithFormat:@"%@Failed", call.method]
-                message:[NSString stringWithFormat:@"Error: peerConnection not found!"]
-                details:nil]);
-      return;
-    }
-    RTCRtpSender* sender = [self getRtpSenderById:peerConnection Id:senderId];
-    if (sender == nil) {
-      result([FlutterError errorWithCode:[NSString stringWithFormat:@"%@Failed", call.method]
-                                 message:[NSString stringWithFormat:@"Error: sender not found!"]
-                                 details:nil]);
-      return;
-    }
-    [peerConnection removeTrack:sender];
-    result(nil);
   } else if ([@"getSenders" isEqualToString:call.method]) {
     NSDictionary* argsMap = call.arguments;
     NSString* peerConnectionId = argsMap[@"peerConnectionId"];
@@ -1461,8 +1462,8 @@
     BOOL srtpEnableEncryptedRtpHeaderExtensions = NO;
     BOOL srtpEnableAes128Sha1_32CryptoCipher = NO;
 
-    if (options[@"enableGcmCryptoSuites" != nil &&
-                [options[@"enableGcmCryptoSuites"] isKindOfClass:[NSNumber class]]]) {
+    if (options[@"enableGcmCryptoSuites"] != nil &&
+                [options[@"enableGcmCryptoSuites"] isKindOfClass:[NSNumber class]]) {
       NSNumber* value = options[@"enableGcmCryptoSuites"];
       srtpEnableGcmCryptoSuites = [value boolValue];
     }

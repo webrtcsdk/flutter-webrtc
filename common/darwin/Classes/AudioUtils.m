@@ -10,8 +10,7 @@
   // this method is called
   RTCAudioSessionConfiguration* config = [RTCAudioSessionConfiguration webRTCConfiguration];
   // require audio session to be either PlayAndRecord or MultiRoute
-  if (recording && session.category != AVAudioSessionCategoryPlayAndRecord &&
-      session.category != AVAudioSessionCategoryMultiRoute) {
+  if (recording) {
     config.category = AVAudioSessionCategoryPlayAndRecord;
     config.categoryOptions =
         AVAudioSessionCategoryOptionAllowBluetooth | AVAudioSessionCategoryOptionAllowBluetoothA2DP;
@@ -74,13 +73,6 @@
                                                  error:&error];
     if (!success)
       NSLog(@"Port override failed due to: %@", error);
-
-    success = [session setActive:YES error:&error];
-    if (!success)
-      NSLog(@"Audio session override failed: %@", error);
-    else
-      NSLog(@"AudioSession override via Earpiece/Headset is successful ");
-
   } else {
     [session setMode:config.mode error:&error];
     BOOL success = [session setCategory:config.category
@@ -94,21 +86,22 @@
                                          error:&error];
     if (!success)
       NSLog(@"Port override failed due to: %@", error);
-
-    success = [session setActive:YES error:&error];
-    if (!success)
-      NSLog(@"Audio session override failed: %@", error);
-    else
-      NSLog(@"AudioSession override via Loudspeaker is successful ");
   }
   [session unlockForConfiguration];
 }
 
 + (void)deactiveRtcAudioSession {
-  NSError* error = nil;
-  [[AVAudioSession sharedInstance] setActive:NO
-                                 withOptions:AVAudioSessionSetActiveOptionNotifyOthersOnDeactivation
-                                       error:&error];
+    NSError* error = nil;
+    RTCAudioSession* session = [RTCAudioSession sharedInstance];
+    [session lockForConfiguration];
+    if([session isActive]) {
+      BOOL success = [session setActive:NO error:&error];
+      if (!success)
+          NSLog(@"RTC Audio session deactive failed: %@", error);
+      else
+          NSLog(@"RTC AudioSession deactive is successful ");
+    }
+    [session unlockForConfiguration];
 }
 
 @end
