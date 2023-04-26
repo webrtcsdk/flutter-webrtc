@@ -11,15 +11,16 @@ dependencies:
       git:
         url: git@github.com:Iambiengcode/dart-webrtc.git
         path: "."
-        ref: 1.0.15+1
+        ref: 1.0.16+1
   flutter:
     sdk: flutter
+  js: ^0.6.4
   path_provider: ^2.0.2
   webrtc_interface:
     git:
       url: git@github.com:Iambiengcode/webrtc-interface.git
       path: "."
-      ref: 1.0.11+1
+      ref: 1.0.13+1
 
 dev_dependencies:
   flutter_test:

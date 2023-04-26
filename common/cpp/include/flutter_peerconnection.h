@@ -109,6 +109,11 @@ class FlutterPeerConnection {
                          std::string rtpSenderId,
                          std::unique_ptr<MethodResultProxy> result);
 
+  void RtpSenderSetStream(RTCPeerConnection* pc,
+                          std::list<std::string> streamIds,
+                          std::string rtpSenderId,
+                          std::unique_ptr<MethodResultProxy> result);
+
   void RtpSenderReplaceTrack(RTCPeerConnection* pc,
                              RTCMediaTrack* track,
                              std::string rtpSenderId,
@@ -177,10 +182,6 @@ class FlutterPeerConnection {
                 scoped_refptr<RTCMediaTrack> track,
                 std::list<std::string> streamIds,
                 std::unique_ptr<MethodResultProxy> result);
-
-  libwebrtc::scoped_refptr<libwebrtc::RTCRtpSender> GetRtpSenderById(
-      RTCPeerConnection* pc,
-      std::string id);
 
   void RemoveTrack(RTCPeerConnection* pc,
                    std::string senderId,
