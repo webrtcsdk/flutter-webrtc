@@ -158,6 +158,7 @@ public class MethodCallHandlerImpl implements MethodCallHandler, StateProvider {
     EglBase.Context eglContext = EglUtils.getRootEglBaseContext();
 
     getUserMediaImpl = new GetUserMediaImpl(this, context);
+    frameCryptor = new FlutterRTCFrameCryptor(this);
 
     /*
      * Execute any time before creating a LocalAudioTrack and connecting
@@ -165,7 +166,6 @@ public class MethodCallHandlerImpl implements MethodCallHandler, StateProvider {
      */
     Boolean isDeviceSupportHWAec = WebRtcAudioEffects.canUseAcousticEchoCanceler();
     Boolean isDeviceSupportHWNs = WebRtcAudioEffects.canUseNoiseSuppressor();
-    frameCryptor = new FlutterRTCFrameCryptor(this);
 
     audioDeviceModule = JavaAudioDeviceModule.builder(context)
             .setUseHardwareAcousticEchoCanceler(isDeviceSupportHWAec)
