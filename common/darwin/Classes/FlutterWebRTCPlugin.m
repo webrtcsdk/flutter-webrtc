@@ -815,6 +815,10 @@ static NSString *sharedPeerConnectionId;
     [AudioUtils setSpeakerphoneOn:_speakerOn];
     result(nil);
   }
+  else if ([@"enableSpeakerphoneButPreferBluetooth" isEqualToString:call.method]) {
+    [AudioUtils setSpeakerphoneOnButPreferBluetooth];
+    result(nil);
+  }
 #endif
   else if ([@"getLocalDescription" isEqualToString:call.method]) {
     NSDictionary* argsMap = call.arguments;
