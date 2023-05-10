@@ -90,7 +90,7 @@
   [session unlockForConfiguration];
 }
 
-+ (void)setSpeakerphoneOnButPreferBluetooth:() {
++ (void)setSpeakerphoneOnButPreferBluetooth {
   RTCAudioSession* session = [RTCAudioSession sharedInstance];
   RTCAudioSessionConfiguration* config = [RTCAudioSessionConfiguration webRTCConfiguration];
   [session lockForConfiguration];
