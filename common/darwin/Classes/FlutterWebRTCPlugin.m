@@ -163,7 +163,7 @@ static NSString *sharedPeerConnectionId;
       [[VideoEncoderFactorySimulcast alloc] initWithPrimary:encoderFactory fallback:encoderFactory];
 
     _peerConnectionFactory = [[RTCPeerConnectionFactory alloc]
-                              initWithEncoderFactory:encoderFactory
+                              initWithEncoderFactory:simulcastFactory
                               decoderFactory:decoderFactory];
 
   NSDictionary* fieldTrials = @{kRTCFieldTrialUseNWPathMonitor : kRTCFieldTrialEnabledValue};
