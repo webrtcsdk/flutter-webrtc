@@ -9,6 +9,7 @@ import android.graphics.SurfaceTexture;
 import android.hardware.Camera;
 import android.hardware.Camera.CameraInfo;
 import android.media.AudioDeviceInfo;
+import android.media.AudioManager;
 import android.os.Build;
 import android.util.Log;
 import android.util.LongSparseArray;
@@ -97,9 +98,7 @@ public class MethodCallHandlerImpl implements MethodCallHandler, StateProvider {
   private final BinaryMessenger messenger;
   private final Context context;
   private final TextureRegistry textures;
-
   private PeerConnectionFactory mFactory;
-
   private final Map<String, MediaStream> localStreams = new HashMap<>();
   private final Map<String, MediaStreamTrack> localTracks = new HashMap<>();
   private final LongSparseArray<FlutterRTCVideoRenderer> renders = new LongSparseArray<>();
@@ -961,6 +960,12 @@ public class MethodCallHandlerImpl implements MethodCallHandler, StateProvider {
       }
     }
 
+    // maxIPv6Networks
+    if (map.hasKey("maxIPv6Networks")
+            && map.getType("maxIPv6Networks") == ObjectType.Number) {
+      conf.maxIPv6Networks = map.getInt("maxIPv6Networks");
+    }
+
     // === below is private api in webrtc ===
 
     // tcpCandidatePolicy (private api)
@@ -1277,10 +1282,21 @@ public class MethodCallHandlerImpl implements MethodCallHandler, StateProvider {
         if (device.getType() == AudioDeviceInfo.TYPE_BUILTIN_MIC || device.getType() == AudioDeviceInfo.TYPE_BLUETOOTH_SCO ||
                 device.getType() == AudioDeviceInfo.TYPE_WIRED_HEADSET) {
           int type = (device.getType() & 0xFF);
-          String label = Build.VERSION.SDK_INT < Build.VERSION_CODES.P ? String.valueOf(i) : device.getAddress();
-          if(label.equals("")  && device.getType() == AudioDeviceInfo.TYPE_WIRED_HEADSET) {
+          String label = device.getProductName().toString();
+          String address = Build.VERSION.SDK_INT < Build.VERSION_CODES.P ? String.valueOf(i) : device.getAddress();
+
+          if (device.getType() == AudioDeviceInfo.TYPE_BUILTIN_MIC) {
+              label = "Built-in Microphone (" + address +  ")";
+          }
+
+          if(device.getType() == AudioDeviceInfo.TYPE_WIRED_HEADSET) {
             label = "Wired Headset";
           }
+
+          if(device.getType() == AudioDeviceInfo.TYPE_BLUETOOTH_SCO) {
+            label = "Bluetooth SCO (" + device.getProductName().toString() +  ")";
+          }
+
           ConstraintsMap audio = new ConstraintsMap();
           audio.putString("label", label);
           audio.putString("deviceId", String.valueOf(i));
