@@ -3,7 +3,7 @@
 #
 Pod::Spec.new do |s|
   s.name             = 'flutter_webrtc'
-  s.version          = '0.9.25'
+  s.version          = '0.9.26'
   s.summary          = 'Flutter WebRTC plugin for iOS.'
   s.description      = <<-DESC
 A new flutter plugin project.
@@ -15,7 +15,9 @@ A new flutter plugin project.
   s.source_files = 'Classes/**/*'
   s.public_header_files = 'Classes/**/*.h'
   s.dependency 'Flutter'
-  s.dependency 'WebRTC-SDK', '104.5112.16'
+  # s.dependency 'WebRTC-SDK', '104.5112.16'
+  s.source       = { :http => "https://github.com/webrtc-waterbus-io/webrtc-build/releases/download/m113.5672.01/WebRTC.xcframework.zip" }
+  s.vendored_frameworks = "WebRTC.xcframework"
   s.ios.deployment_target = '10.0'
   s.static_framework = true
 end
