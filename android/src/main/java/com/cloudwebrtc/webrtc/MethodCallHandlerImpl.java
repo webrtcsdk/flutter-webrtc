@@ -151,6 +151,7 @@ public class MethodCallHandlerImpl implements MethodCallHandler, StateProvider {
     PeerConnectionFactory.initialize(
             InitializationOptions.builder(context)
                     .setEnableInternalTracer(true)
+                    .setFieldTrials("WebRTC-Fec-03-Advertised/Enabled/") // Enable FEC
                     .createInitializationOptions());
 
     // Initialize EGL contexts required for HW acceleration.
@@ -1097,6 +1098,10 @@ public class MethodCallHandlerImpl implements MethodCallHandler, StateProvider {
   public String peerConnectionInit(ConstraintsMap configuration, ConstraintsMap constraints) {
     String peerConnectionId = getNextStreamUUID();
     RTCConfiguration conf = parseRTCConfiguration(configuration);
+    conf.suspendBelowMinBitrate = true;
+    conf.enableCpuOveruseDetection = true;
+    conf.audioJitterBufferMaxPackets = 3;
+
     PeerConnectionObserver observer = new PeerConnectionObserver(conf, this, messenger, peerConnectionId);
     PeerConnection peerConnection
             = mFactory.createPeerConnection(
