@@ -1101,6 +1101,7 @@ public class MethodCallHandlerImpl implements MethodCallHandler, StateProvider {
     conf.suspendBelowMinBitrate = true;
     conf.enableCpuOveruseDetection = true;
     conf.audioJitterBufferMaxPackets = 3;
+    conf.combinedAudioVideoBwe = true;
 
     PeerConnectionObserver observer = new PeerConnectionObserver(conf, this, messenger, peerConnectionId);
     PeerConnection peerConnection
