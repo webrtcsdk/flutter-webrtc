@@ -1,5 +1,6 @@
 package com.cloudwebrtc.webrtc
 
+import android.os.Build
 import org.webrtc.EglBase
 import org.webrtc.HardwareVideoEncoderFactory
 import org.webrtc.SimulcastVideoEncoderFactory
@@ -81,7 +82,14 @@ internal class SimulcastVideoEncoderFactoryWrapper(
             supportedCodecInfos.addAll(softwareVideoEncoderFactory.supportedCodecs)
             supportedCodecInfos.addAll(hardwareVideoEncoderFactory.supportedCodecs)
 
-            val preferredCodecOrder = arrayOf("VP9", "AV1", "H264", "VP8")
+            val preferredCodecOrderVP9 = arrayOf("VP9", "AV1", "H264", "VP8")
+            val preferredCodecOrderAV1 = arrayOf("AV1", "VP9", "H264", "VP8")
+
+            var preferredCodecOrder = preferredCodecOrderVP9
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                preferredCodecOrder = preferredCodecOrderAV1
+            }
 
             return getPreferredVideoCodecs(preferredCodecOrder, supportedCodecInfos)
         }
