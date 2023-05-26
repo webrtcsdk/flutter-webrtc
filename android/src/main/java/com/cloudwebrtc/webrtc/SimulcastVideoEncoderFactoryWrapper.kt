@@ -82,14 +82,7 @@ internal class SimulcastVideoEncoderFactoryWrapper(
             supportedCodecInfos.addAll(softwareVideoEncoderFactory.supportedCodecs)
             supportedCodecInfos.addAll(hardwareVideoEncoderFactory.supportedCodecs)
 
-            val preferredCodecOrderVP9 = arrayOf("VP9", "AV1", "H264", "VP8")
-            val preferredCodecOrderAV1 = arrayOf("AV1", "VP9", "H264", "VP8")
-
-            var preferredCodecOrder = preferredCodecOrderVP9
-
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                preferredCodecOrder = preferredCodecOrderAV1
-            }
+            val preferredCodecOrder = arrayOf("H264", "VP9", "AV1", "VP8")
 
             return getPreferredVideoCodecs(preferredCodecOrder, supportedCodecInfos)
         }
