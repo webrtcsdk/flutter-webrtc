@@ -110,6 +110,7 @@ class GetUserMediaImpl {
     private OutputAudioSamplesInterceptor outputSamplesInterceptor = null;
     JavaAudioDeviceModule audioDeviceModule;
     private final SparseArray<MediaRecorderImpl> mediaRecorders = new SparseArray<>();
+    private AudioDeviceInfo preferredInput = null;
 
     public void screenRequestPermissions(ResultReceiver resultReceiver) {
         final Activity activity = stateProvider.getActivity();
@@ -349,7 +350,7 @@ class GetUserMediaImpl {
             addDefaultAudioConstraints(audioConstraints);
         } else {
             audioConstraints = MediaConstraintsUtils.parseMediaConstraints(constraints.getMap("audio"));
-            deviceId =  getSourceIdConstraint(constraints.getMap("audio"));
+            deviceId = getSourceIdConstraint(constraints.getMap("audio"));
         }
 
         Log.i(TAG, "getUserMedia(audio): " + audioConstraints);
@@ -365,9 +366,13 @@ class GetUserMediaImpl {
             }
         }
 
-        if(deviceId != null) {
-            setPreferredInputDevice(Integer.parseInt(deviceId));
-        }
+        // if(deviceId != null) {
+        //     try {
+        //         setPreferredInputDevice(Integer.parseInt(deviceId));
+        //     } catch (Exception e) {
+        //         Log.e(TAG, "setPreferredInputDevice failed", e);
+        //     }
+        // }
 
         AudioTrack track =  pcFactory.createAudioTrack(trackId, audioSource);
         stream.addTrack(track);
@@ -381,6 +386,10 @@ class GetUserMediaImpl {
         trackParams.putString("label", track.id());
         trackParams.putString("readyState", track.state().toString());
         trackParams.putBoolean("remote", false);
+
+        if(deviceId == null) {
+            deviceId = "" + getPreferredInputDevice(preferredInput);
+        }
 
         ConstraintsMap settings = new ConstraintsMap();
         settings.putString("deviceId", deviceId);
@@ -1156,7 +1165,23 @@ class GetUserMediaImpl {
         android.media.AudioManager audioManager = ((android.media.AudioManager) applicationContext.getSystemService(Context.AUDIO_SERVICE));
         final AudioDeviceInfo[] devices = audioManager.getDevices(android.media.AudioManager.GET_DEVICES_INPUTS);
         if (devices.length > i) {
-            audioDeviceModule.setPreferredInputDevice(devices[i]);
+            preferredInput = devices[i];
+            audioDeviceModule.setPreferredInputDevice(preferredInput);
         }
+    }
+
+    @RequiresApi(api = VERSION_CODES.M)
+    int getPreferredInputDevice(AudioDeviceInfo deviceInfo) {
+        if(deviceInfo == null) {
+            return -1;
+        }
+        android.media.AudioManager audioManager = ((android.media.AudioManager) applicationContext.getSystemService(Context.AUDIO_SERVICE));
+        final AudioDeviceInfo[] devices = audioManager.getDevices(android.media.AudioManager.GET_DEVICES_INPUTS);
+        for(int i = 0; i < devices.length; i++) {
+            if(devices[i].getId() == deviceInfo.getId()) {
+                return i;
+            }
+        }
+        return -1;
     }
 }
