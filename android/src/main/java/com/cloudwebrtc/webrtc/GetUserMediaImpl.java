@@ -952,7 +952,7 @@ class GetUserMediaImpl {
         segmenter.process(inputImage)
                 .addOnSuccessListener(new OnSuccessListener<SegmentationMask>() {
                     @Override
-                    public void onSuccess(SegmentationMask segmentationMask) {
+                    public void onSuccess(@NonNull SegmentationMask segmentationMask) {
                         // Xử lý khi phân đoạn thành công
                         ByteBuffer mask = segmentationMask.getBuffer();
                         int maskWidth = segmentationMask.getWidth();
