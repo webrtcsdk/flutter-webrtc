@@ -775,6 +775,8 @@ class GetUserMediaImpl {
 
         vbVideoSource = videoSource;
 
+        setVirtualBackground();
+
         String threadName = Thread.currentThread().getName() + "_texture_camera_thread";
         SurfaceTextureHelper surfaceTextureHelper =
                 SurfaceTextureHelper.create(threadName, EglUtils.getRootEglBaseContext());
