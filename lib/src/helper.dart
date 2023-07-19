@@ -134,4 +134,19 @@ class Helper {
       AppleNativeAudioManagement.setAppleAudioConfiguration(
           AppleNativeAudioManagement.getAppleAudioConfigurationForMode(mode,
               preferSpeakerOutput: preferSpeakerOutput));
+
+  // Virtual Background
+  static Future<void> enableVirtualBackground({
+    required Uint8List backgroundImage,
+    double thresholdConfidence = 0.7,
+  }) async {
+    await WebRTC.invokeMethod("enableVirtualBackground", {
+      "imageBytes": backgroundImage,
+      "confidence": thresholdConfidence,
+    });
+  }
+
+  static Future<void> disableVirtualBackground() async {
+    await WebRTC.invokeMethod("disableVirtualBackground");
+  }
 }
