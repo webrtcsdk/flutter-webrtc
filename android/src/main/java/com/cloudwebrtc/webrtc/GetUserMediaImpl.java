@@ -8,8 +8,6 @@ import android.content.ContentValues;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
-import android.graphics.Bitmap;
-import android.graphics.ImageFormat;
 import android.hardware.Camera;
 import android.hardware.Camera.Parameters;
 import android.hardware.camera2.CameraAccessException;
@@ -35,7 +33,6 @@ import android.util.SparseArray;
 import android.view.Surface;
 import android.view.WindowManager;
 
-import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.annotation.RequiresApi;
 
@@ -51,14 +48,6 @@ import com.cloudwebrtc.webrtc.utils.EglUtils;
 import com.cloudwebrtc.webrtc.utils.MediaConstraintsUtils;
 import com.cloudwebrtc.webrtc.utils.ObjectType;
 import com.cloudwebrtc.webrtc.utils.PermissionUtils;
-import com.google.android.gms.tasks.OnFailureListener;
-import com.google.android.gms.tasks.OnSuccessListener;
-import com.google.mlkit.common.MlKitException;
-import com.google.mlkit.vision.common.InputImage;
-import com.google.mlkit.vision.segmentation.Segmentation;
-import com.google.mlkit.vision.segmentation.SegmentationMask;
-import com.google.mlkit.vision.segmentation.Segmenter;
-import com.google.mlkit.vision.segmentation.selfie.SelfieSegmenterOptions;
 
 import org.webrtc.AudioSource;
 import org.webrtc.AudioTrack;
@@ -69,38 +58,24 @@ import org.webrtc.Camera2Enumerator;
 import org.webrtc.CameraEnumerationAndroid.CaptureFormat;
 import org.webrtc.CameraEnumerator;
 import org.webrtc.CameraVideoCapturer;
-import org.webrtc.JavaI420Buffer;
 import org.webrtc.MediaConstraints;
 import org.webrtc.MediaStream;
 import org.webrtc.MediaStreamTrack;
 import org.webrtc.PeerConnectionFactory;
 import org.webrtc.SurfaceTextureHelper;
 import org.webrtc.VideoCapturer;
-import org.webrtc.VideoFrame;
-import org.webrtc.VideoProcessor;
-import org.webrtc.VideoSink;
 import org.webrtc.VideoSource;
 import org.webrtc.VideoTrack;
-import org.webrtc.YuvHelper;
 import org.webrtc.audio.JavaAudioDeviceModule;
 
 import java.io.File;
 import java.lang.reflect.Field;
-import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 import io.flutter.plugin.common.MethodChannel.Result;
-
-import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
-import android.graphics.Canvas;
-import android.graphics.PorterDuff;
-import android.media.Image;
-import android.util.Log;
-import androidx.camera.core.ImageProxy;
 
 /**
  * The implementation of {@code getUserMedia} extracted into a separate file in order to reduce
@@ -137,13 +112,7 @@ class GetUserMediaImpl {
     private final SparseArray<MediaRecorderImpl> mediaRecorders = new SparseArray<>();
     private AudioDeviceInfo preferredInput = null;
 
-    private final SelfieSegmenterOptions segmentOptions = new SelfieSegmenterOptions.Builder()
-            .setDetectorMode(SelfieSegmenterOptions.SINGLE_IMAGE_MODE)
-            .build();
-    private final Segmenter segmenter = Segmentation.getClient(segmentOptions);
-
-    private VideoSource vbVideoSource = null;
-    private VideoSink vbVideoSink = null;
+    private FlutterRTCVirtualBackground flutterRTCVirtualBackground = null;
 
     public void screenRequestPermissions(ResultReceiver resultReceiver) {
         final Activity activity = stateProvider.getActivity();
@@ -239,9 +208,10 @@ class GetUserMediaImpl {
         }
     }
 
-    GetUserMediaImpl(StateProvider stateProvider, Context applicationContext) {
+    GetUserMediaImpl(StateProvider stateProvider, Context applicationContext, FlutterRTCVirtualBackground flutterRTCVirtualBackground) {
         this.stateProvider = stateProvider;
         this.applicationContext = applicationContext;
+        this.flutterRTCVirtualBackground = flutterRTCVirtualBackground;
     }
 
     static private void resultError(String method, String error, Result result) {
@@ -542,7 +512,7 @@ class GetUserMediaImpl {
                                             @Override
                                             public void onStop() {
                                                 super.onStop();
-                                                // After Huawei P30 and Android 10 version test, the onstop method is called, which will not affect the next process, 
+                                                // After Huawei P30 and Android 10 version test, the onstop method is called, which will not affect the next process,
                                                 // and there is no need to call the resulterror method
                                                 //resultError("MediaProjection.Callback()", "User revoked permission to capture the screen.", result);
                                             }
@@ -773,9 +743,7 @@ class GetUserMediaImpl {
         PeerConnectionFactory pcFactory = stateProvider.getPeerConnectionFactory();
         VideoSource videoSource = pcFactory.createVideoSource(false);
 
-        vbVideoSource = videoSource;
-
-        setVirtualBackground();
+        flutterRTCVirtualBackground.initialize(videoSource);
 
         String threadName = Thread.currentThread().getName() + "_texture_camera_thread";
         SurfaceTextureHelper surfaceTextureHelper =
@@ -840,223 +808,11 @@ class GetUserMediaImpl {
         return trackParams;
     }
 
-    void setVirtualBackground() {
-        vbVideoSource.setVideoProcessor(new VideoProcessor() {
-            @Override
-            public void onCapturerStarted(boolean success) {
-                // Xử lý khi bắt đầu capture video
-            }
-
-            @Override
-            public void onCapturerStopped() {
-                // Xử lý khi dừng capture video
-            }
-
-            @Override
-            public void onFrameCaptured(VideoFrame frame) {
-                // Chuyển đổi frame thành bitmap
-                Bitmap bitmap = videoFrameToBitmap(frame);
-
-                // Xử lý segment với bitmap
-                processSegmentation(bitmap);
-            }
-
-            @Override
-            public void setSink(VideoSink sink) {
-                // Lưu sink để gửi frame đã được cập nhật trở lại WebRTC
-                // Sink sẽ được sử dụng sau khi xử lý segment
-                vbVideoSink = sink;
-            }
-        });
-    }
-
-    public Bitmap videoFrameToBitmap(VideoFrame videoFrame) {
-        VideoFrame.Buffer buffer = videoFrame.getBuffer();
-        int width = buffer.getWidth();
-        int height = buffer.getHeight();
-
-        if (buffer instanceof VideoFrame.TextureBuffer) {
-            // Không hỗ trợ trực tiếp chuyển đổi từ TextureBuffer sang Bitmap
-            return null;
-        } else if (buffer instanceof VideoFrame.I420Buffer) {
-            VideoFrame.I420Buffer i420Buffer = (VideoFrame.I420Buffer) buffer;
-
-            int ySize = width * height;
-            int uvSize = width * height / 4;
-
-            ByteBuffer dataY = i420Buffer.getDataY();
-            ByteBuffer dataU = i420Buffer.getDataU();
-            ByteBuffer dataV = i420Buffer.getDataV();
-
-            byte[] dataYArray = new byte[ySize];
-            byte[] dataUArray = new byte[uvSize];
-            byte[] dataVArray = new byte[uvSize];
-
-            dataY.get(dataYArray);
-            dataU.get(dataUArray);
-            dataV.get(dataVArray);
-
-            // Chuyển đổi từ YUV sang RGB
-            int[] rgbData = convertYUVtoRGB(dataYArray, dataUArray, dataVArray, width, height);
-
-            // Tạo Bitmap từ dữ liệu RGB
-            Bitmap bitmap = Bitmap.createBitmap(rgbData, width, height, Bitmap.Config.ARGB_8888);
-
-            return bitmap;
-        }
-
-        return null;
-    }
-
-    private int[] convertYUVtoRGB(byte[] yData, byte[] uData, byte[] vData, int width, int height) {
-        int[] rgbData = new int[width * height];
-        int uvIndex = 0;
-        int yOffset = 0;
-
-        for (int y = 0; y < height; y++) {
-            int uvRowStart = uvIndex;
-            int uvRowOffset = y >> 1;
-
-            for (int x = 0; x < width; x++) {
-                int yIndex = yOffset + x;
-                int uvIndexOffset = uvRowStart + (x >> 1);
-
-                int yValue = yData[yIndex] & 0xFF;
-                int uValue = uData[uvIndexOffset] & 0xFF;
-                int vValue = vData[uvIndexOffset] & 0xFF;
-
-                int r = yValue + (int) (1.370705f * (vValue - 128));
-                int g = yValue - (int) (0.698001f * (vValue - 128)) - (int) (0.337633f * (uValue - 128));
-                int b = yValue + (int) (1.732446f * (uValue - 128));
-
-                r = Math.max(0, Math.min(255, r));
-                g = Math.max(0, Math.min(255, g));
-                b = Math.max(0, Math.min(255, b));
-
-                int pixelColor = 0xFF000000 | (r << 16) | (g << 8) | b;
-                rgbData[y * width + x] = pixelColor;
-            }
-
-            if (y % 2 == 1) {
-                uvIndex = uvRowStart + width / 2;
-                yOffset += width;
-            }
-        }
-
-        return rgbData;
-    }
-
-    private void processSegmentation(Bitmap bitmap) {
-        // Tạo InputImage từ bitmap
-        InputImage inputImage = InputImage.fromBitmap(bitmap, 0);
-
-        // Xử lý phân đoạn
-        segmenter.process(inputImage)
-                .addOnSuccessListener(new OnSuccessListener<SegmentationMask>() {
-                    @Override
-                    public void onSuccess(@NonNull SegmentationMask segmentationMask) {
-                        // Xử lý khi phân đoạn thành công
-                        ByteBuffer mask = segmentationMask.getBuffer();
-                        int maskWidth = segmentationMask.getWidth();
-                        int maskHeight = segmentationMask.getHeight();
-                        mask.rewind();
-
-                        // Chuyển đổi buffer thành mảng màu
-                        int[] colors = maskColorsFromByteBuffer(mask, maskWidth, maskHeight);
-
-                        // Tạo bitmap đã được phân đoạn từ mảng màu
-                        Bitmap segmentedBitmap = createBitmapFromColors(colors, maskWidth, maskHeight);
-
-                        // Vẽ ảnh nền đã phân đoạn lên canvas
-                        Bitmap outputBitmap = drawSegmentedBackground(segmentedBitmap, segmentedBitmap);
-
-                        // Tạo VideoFrame mới từ bitmap đã xử lý
-                        int frameRotation = 180; // Frame rotation angle (customize as needed)
-                        long frameTimestamp = System.nanoTime(); // Frame timestamp (customize as needed)
-                        VideoFrame outputVideoFrame = createVideoFrame(outputBitmap, frameRotation, frameTimestamp);
-
-                        // Gửi frame đã được cập nhật trở lại WebRTC
-                        vbVideoSink.onFrame(outputVideoFrame);
-                    }
-                })
-                .addOnFailureListener(new OnFailureListener() {
-                    @Override
-                    public void onFailure(@NonNull Exception exception) {
-                        // Xử lý khi phân đoạn thất bại
-                        Log.e(TAG, "Segmentation failed: " + exception.getMessage());
-                    }
-                });
-    }
-
-    private Bitmap drawSegmentedBackground(Bitmap segmentedBitmap, Bitmap backgroundBitmap) {
-        Bitmap outputBitmap = Bitmap.createBitmap(
-                segmentedBitmap.getWidth(), segmentedBitmap.getHeight(), Bitmap.Config.ARGB_8888
-        );
-        Canvas canvas = new Canvas(outputBitmap);
-
-        // Vẽ ảnh nền đã phân đoạn lên canvas
-        canvas.drawBitmap(backgroundBitmap, 0, 0, null);
-        canvas.drawBitmap(segmentedBitmap, 0, 0, null);
-
-        return outputBitmap;
-    }
-
-    private VideoFrame createVideoFrame(Bitmap bitmap, int rotation, long timestampNs) {
-        ByteBuffer buffer = ByteBuffer.allocate(bitmap.getByteCount());
-        bitmap.copyPixelsToBuffer(buffer);
-        byte[] data = buffer.array();
-
-        int width = bitmap.getWidth();
-        int height = bitmap.getHeight();
-        int strideY = width;
-        int strideU = (width + 1) / 2;
-        int strideV = (width + 1) / 2;
-
-        byte[] dataU = new byte[width * height / 4];
-        byte[] dataV = new byte[width * height / 4];
-        for (int i = 0; i < width * height / 4; i++) {
-            dataU[i] = data[width * height + i];
-            dataV[i] = data[width * height + width * height / 4 + i];
-        }
-
-        Runnable releaseCallback = () -> {
-            // Thực hiện các thao tác giải phóng tài nguyên liên quan tại đây (nếu có)
-        };
-
-        VideoFrame.I420Buffer i420Buffer = JavaI420Buffer.wrap(
-                width,
-                height,
-                ByteBuffer.wrap(data),
-                strideY,
-                ByteBuffer.wrap(dataU),
-                strideU,  ByteBuffer.wrap(dataV), strideV, releaseCallback
-        );
-
-        return new VideoFrame(i420Buffer, rotation, timestampNs);
-    }
-
-
-    // Hàm chuyển đổi buffer thành mảng màu
-    private int[] maskColorsFromByteBuffer(ByteBuffer buffer, int width, int height) {
-        // Chuyển đổi từ ByteBuffer thành mảng màu, tùy thuộc vào định dạng màu
-        // của buffer. Đảm bảo bạn sử dụng đúng định dạng màu tương ứng với
-        // phân đoạn của ML Kit.
-        // Trong ví dụ này, chúng tôi giả định rằng buffer có định dạng ARGB_8888.
-
-        // Ví dụ: chuyển đổi từ ByteBuffer thành mảng ARGB_8888
-        int[] colors = new int[width * height];
-        buffer.asIntBuffer().get(colors);
-
-        return colors;
-    }
-
-    // Hàm tạo bitmap từ mảng màu
-    private Bitmap createBitmapFromColors(int[] colors, int width, int height) {
-        return Bitmap.createBitmap(colors, width, height, Bitmap.Config.ARGB_8888);
-    }
-
     void removeVideoCapturerSync(String id) {
         synchronized (mVideoCapturers) {
+            // Dispose Virtual Background
+            flutterRTCVirtualBackground.dispose();
+
             VideoCapturerInfo info = mVideoCapturers.get(id);
             if (info != null) {
                 try {
