@@ -17,6 +17,8 @@ import android.hardware.camera2.CameraDevice;
 import android.hardware.camera2.CameraManager;
 import android.hardware.camera2.CaptureRequest;
 import android.media.AudioDeviceInfo;
+import android.media.AudioFormat;
+import android.media.AudioManager;
 import android.media.projection.MediaProjection;
 import android.media.projection.MediaProjectionManager;
 import android.os.Build;
@@ -39,6 +41,7 @@ import androidx.annotation.RequiresApi;
 import com.cloudwebrtc.webrtc.audio.AudioSwitchManager;
 import com.cloudwebrtc.webrtc.record.AudioChannel;
 import com.cloudwebrtc.webrtc.record.AudioSamplesInterceptor;
+import com.cloudwebrtc.webrtc.record.AudioTrackInterceptor;
 import com.cloudwebrtc.webrtc.record.MediaRecorderImpl;
 import com.cloudwebrtc.webrtc.record.OutputAudioSamplesInterceptor;
 import com.cloudwebrtc.webrtc.utils.Callback;
@@ -48,6 +51,7 @@ import com.cloudwebrtc.webrtc.utils.EglUtils;
 import com.cloudwebrtc.webrtc.utils.MediaConstraintsUtils;
 import com.cloudwebrtc.webrtc.utils.ObjectType;
 import com.cloudwebrtc.webrtc.utils.PermissionUtils;
+import com.cloudwebrtc.webrtc.utils.RNNoiseWrapper;
 
 import org.webrtc.AudioSource;
 import org.webrtc.AudioTrack;
@@ -70,6 +74,8 @@ import org.webrtc.audio.JavaAudioDeviceModule;
 
 import java.io.File;
 import java.lang.reflect.Field;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -111,6 +117,8 @@ class GetUserMediaImpl {
     JavaAudioDeviceModule audioDeviceModule;
     private final SparseArray<MediaRecorderImpl> mediaRecorders = new SparseArray<>();
     private AudioDeviceInfo preferredInput = null;
+
+    private AudioTrackInterceptor audioTrackInterceptor = null;
 
     public void screenRequestPermissions(ResultReceiver resultReceiver) {
         final Activity activity = stateProvider.getActivity();
@@ -340,9 +348,9 @@ class GetUserMediaImpl {
     }
 
     private ConstraintsMap getUserAudio(ConstraintsMap constraints, MediaStream stream) {
-        android.media.AudioManager audioManager = ((android.media.AudioManager) stateProvider.getActivity().getApplicationContext()
-                    .getSystemService(Context.AUDIO_SERVICE));
-        audioManager.setMode(android.media.AudioManager.MODE_IN_COMMUNICATION);
+        AudioManager audioManager = ((AudioManager) stateProvider.getActivity().getApplicationContext()
+                .getSystemService(Context.AUDIO_SERVICE));
+        audioManager.setMode(AudioManager.MODE_IN_COMMUNICATION);
         AudioSwitchManager.instance.start();
         MediaConstraints audioConstraints = new MediaConstraints();
         String deviceId = null;
@@ -360,7 +368,10 @@ class GetUserMediaImpl {
         AudioSource audioSource = pcFactory.createAudioSource(audioConstraints);
 
         if(deviceId == null) {
-            final AudioDeviceInfo[] devices = audioManager.getDevices(android.media.AudioManager.GET_DEVICES_INPUTS);
+            AudioDeviceInfo[] devices = new AudioDeviceInfo[0];
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
+                devices = audioManager.getDevices(AudioManager.GET_DEVICES_INPUTS);
+            }
             if(devices.length > 0) {
                 deviceId = "0";
             }
@@ -375,6 +386,33 @@ class GetUserMediaImpl {
         // }
 
         AudioTrack track =  pcFactory.createAudioTrack(trackId, audioSource);
+
+        // RNNoise
+        RNNoiseWrapper rnNoiseWrapper = new RNNoiseWrapper();
+        rnNoiseWrapper.init();
+
+        // Create the audio track with the desired audio constraints
+        android.media.AudioTrack audioTrack = createAudioTrackWithConstraints(audioConstraints);
+        // Create the audio track interceptor
+        audioTrackInterceptor = new AudioTrackInterceptor(audioTrack, new JavaAudioDeviceModule.SamplesReadyCallback() {
+            @Override
+            public void onWebRtcAudioRecordSamplesReady(JavaAudioDeviceModule.AudioSamples audioSamples) {
+                // Process audio with RNNoiseWrapper
+                byte[] audioDataBytes = audioSamples.getData();
+                short[] audioDataShorts = bytesToShorts(audioDataBytes);
+                short[] processedAudioData = rnNoiseWrapper.processAudio(audioDataShorts);
+
+                // Convert the processed audio data back to bytes
+                byte[] processedAudioBytes = shortsToBytes(processedAudioData);
+
+                if (audioTrackInterceptor != null) {
+                    // Write the processed audio data to the audio track
+                    audioTrackInterceptor.write(processedAudioBytes, 0, processedAudioBytes.length);
+                }
+            }
+        });
+
+
         stream.addTrack(track);
 
         stateProvider.putLocalTrack(track.id(), track);
@@ -388,7 +426,9 @@ class GetUserMediaImpl {
         trackParams.putBoolean("remote", false);
 
         if(deviceId == null) {
-            deviceId = "" + getPreferredInputDevice(preferredInput);
+            if (VERSION.SDK_INT >= VERSION_CODES.M) {
+                deviceId = "" + getPreferredInputDevice(preferredInput);
+            }
         }
 
         ConstraintsMap settings = new ConstraintsMap();
@@ -402,6 +442,41 @@ class GetUserMediaImpl {
         trackParams.putMap("settings", settings.toMap());
 
         return trackParams;
+    }
+
+    // Helper method to create AudioTrack with desired audio constraints
+    private android.media.AudioTrack createAudioTrackWithConstraints(MediaConstraints audioConstraints) {
+        int sampleRate = 44100; // Your desired sample rate
+        int channelConfig = AudioFormat.CHANNEL_OUT_MONO; // Mono channel
+        int audioFormat = AudioFormat.ENCODING_PCM_16BIT; // 16-bit PCM
+        int bufferSize = android.media.AudioTrack.getMinBufferSize(sampleRate, channelConfig, audioFormat);
+
+        android.media.AudioTrack audioTrack = new android.media.AudioTrack(
+                AudioManager.STREAM_VOICE_CALL,
+                sampleRate,
+                channelConfig,
+                audioFormat,
+                bufferSize,
+                android.media.AudioTrack.MODE_STREAM
+        );
+
+        return audioTrack;
+    }
+
+
+
+    // Helper method to convert byte[] to short[]
+    private short[] bytesToShorts(byte[] bytes) {
+        short[] shorts = new short[bytes.length / 2];
+        ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN).asShortBuffer().get(shorts);
+        return shorts;
+    }
+
+    // Helper method to convert short[] to byte[]
+    private byte[] shortsToBytes(short[] shorts) {
+        byte[] bytes = new byte[shorts.length * 2];
+        ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN).asShortBuffer().put(shorts);
+        return bytes;
     }
 
     /**

@@ -28,12 +28,28 @@ android {
     if (project.android.hasProperty("namespace")) {
         namespace 'com.cloudwebrtc.webrtc'
     }
+
+    sourceSets.main.jniLibs.srcDirs = ['./jni/']
+
+    externalNativeBuild {
+        cmake {
+            path 'jni/CMakeLists.txt'
+        }
+    }
+
     compileSdkVersion 31
 
     defaultConfig {
         minSdkVersion 21
         testInstrumentationRunner 'androidx.test.runner.AndroidJUnitRunner'
         consumerProguardFiles 'proguard-rules.pro'
+
+        externalNativeBuild {
+            cmake {
+                version '3.10.2'
+                arguments '-DANDROID_STL=c++_static', '-DANDROID_PLATFORM=android-16'
+            }
+        }
     }
 
     lintOptions {
@@ -55,5 +71,9 @@ dependencies {
     implementation 'com.twilio:audioswitch:1.1.8'
     implementation 'androidx.annotation:annotation:1.1.0'
     implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk7:$kotlin_version"
+
+    // ML Kit
+    implementation 'com.google.mlkit:segmentation-selfie:16.0.0-beta4'
+
     // implementation files('libwebrtc.aar')
 }
