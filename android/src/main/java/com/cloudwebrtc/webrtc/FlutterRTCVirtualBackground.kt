@@ -30,7 +30,7 @@ import java.nio.ByteBuffer
 import java.util.Arrays
 import kotlin.math.max
 
-class VirtualBackground {
+class FlutterRTCVirtualBackground {
     val TAG = FlutterWebRTCPlugin.TAG
 
     private var videoSource: VideoSource? = null
@@ -61,8 +61,12 @@ class VirtualBackground {
      */
     fun dispose() {
         this.videoSource = null
-        this.backgroundBitmap = null
         this.expectConfidence = 0.7
+        setBackgroundIsNull()
+    }
+
+    fun setBackgroundIsNull() {
+        this.backgroundBitmap = null
     }
 
     /**
@@ -243,6 +247,11 @@ class VirtualBackground {
                 // Create a segmented bitmap from the array of colors
                 val segmentedBitmap =
                     createBitmapFromColors(colors, bitmap.width, bitmap.height)
+
+
+                if (backgroundBitmap == null) {
+                    return@addOnCompleteListener
+                }
 
                 // Draw the segmented bitmap on top of the background
                 val outputBitmap =
