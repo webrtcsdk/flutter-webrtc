@@ -120,6 +120,8 @@ class GetUserMediaImpl {
 
     private FlutterRTCVirtualBackground flutterRTCVirtualBackground = null;
 
+    private AudioTrackInterceptor audioTrackInterceptor = null;
+
     public void screenRequestPermissions(ResultReceiver resultReceiver) {
         final Activity activity = stateProvider.getActivity();
         if (activity == null) {
@@ -408,6 +410,7 @@ class GetUserMediaImpl {
 
                 if (audioTrackInterceptor != null) {
                     // Write the processed audio data to the audio track
+                    Log.d(TAG, "Removed Background Noise by RNNoise");
                     audioTrackInterceptor.write(processedAudioBytes, 0, processedAudioBytes.length);
                 }
             }
