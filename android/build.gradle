@@ -42,7 +42,7 @@ android {
     }
 
     defaultConfig {
-        minSdkVersion 21
+        minSdkVersion 23
         testInstrumentationRunner 'androidx.test.runner.AndroidJUnitRunner'
         consumerProguardFiles 'proguard-rules.pro'
 
@@ -69,13 +69,16 @@ android {
 }
 
 dependencies {
-     implementation 'io.github.webrtc-sdk:android:114.5735.02'
+    implementation 'io.github.webrtc-sdk:android:114.5735.02'
     implementation 'com.twilio:audioswitch:1.1.8'
     implementation 'androidx.annotation:annotation:1.1.0'
     implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk7:$kotlin_version"
 
     // ML Kit
-    implementation 'com.google.mlkit:segmentation-selfie:16.0.0-beta4'
+    implementation 'com.google.mlkit:segmentation-selfie:16.0.0-beta3'
 
+    // Libyuv
+    implementation "io.github.crow-misia.libyuv:libyuv-android:0.28.0"
+    implementation 'androidx.camera:camera-core:1.0.2'
     // implementation files('libwebrtc.aar')
 }
