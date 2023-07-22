@@ -10,7 +10,9 @@ import android.graphics.BitmapFactory;
 import android.graphics.SurfaceTexture;
 import android.hardware.Camera;
 import android.hardware.Camera.CameraInfo;
+import android.media.AudioAttributes;
 import android.media.AudioDeviceInfo;
+import android.media.AudioFormat;
 import android.media.AudioManager;
 import android.os.Build;
 import android.util.Log;
@@ -21,8 +23,10 @@ import androidx.annotation.Nullable;
 import androidx.annotation.RequiresApi;
 
 import com.cloudwebrtc.webrtc.audio.AudioDeviceKind;
+import com.cloudwebrtc.webrtc.audio.AudioInterceptorCallback;
 import com.cloudwebrtc.webrtc.audio.AudioSwitchManager;
 import com.cloudwebrtc.webrtc.record.AudioChannel;
+import com.cloudwebrtc.webrtc.record.AudioTrackInterceptor;
 import com.cloudwebrtc.webrtc.record.FrameCapturer;
 import com.cloudwebrtc.webrtc.utils.AnyThreadResult;
 import com.cloudwebrtc.webrtc.utils.Callback;
@@ -32,6 +36,7 @@ import com.cloudwebrtc.webrtc.utils.EglUtils;
 import com.cloudwebrtc.webrtc.utils.ObjectType;
 import com.cloudwebrtc.webrtc.utils.PermissionUtils;
 
+import com.cloudwebrtc.webrtc.utils.RNNoiseWrapper;
 import com.twilio.audioswitch.AudioDevice;
 
 import org.webrtc.AudioTrack;
@@ -74,6 +79,7 @@ import org.webrtc.audio.JavaAudioDeviceModule;
 import java.io.File;
 import java.io.UnsupportedEncodingException;
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -90,6 +96,7 @@ import io.flutter.plugin.common.MethodChannel.Result;
 import io.flutter.view.TextureRegistry;
 import io.flutter.view.TextureRegistry.SurfaceTextureEntry;
 
+import org.webrtc.audio.WebRtcAudioTrackUtils;
 import org.webrtc.voiceengine.WebRtcAudioManager;
 import org.webrtc.voiceengine.WebRtcAudioUtils;
 import org.webrtc.voiceengine.WebRtcAudioEffects;
@@ -175,11 +182,36 @@ public class MethodCallHandlerImpl implements MethodCallHandler, StateProvider {
     Boolean isDeviceSupportHWAec = WebRtcAudioEffects.canUseAcousticEchoCanceler();
     Boolean isDeviceSupportHWNs = WebRtcAudioEffects.canUseNoiseSuppressor();
 
-    audioDeviceModule = JavaAudioDeviceModule.builder(context)
-            .setUseHardwareAcousticEchoCanceler(isDeviceSupportHWAec)
-            .setUseHardwareNoiseSuppressor(isDeviceSupportHWNs)
-            .setSamplesReadyCallback(getUserMediaImpl.inputSamplesInterceptor)
-            .createAudioDeviceModule();
+    try {
+      if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
+        android.media.AudioTrack audioTrack = new android.media.AudioTrack.Builder()
+                .setAudioAttributes(new AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_VOICE_COMMUNICATION)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                        .build())
+                .setAudioFormat(new AudioFormat.Builder()
+                        .setSampleRate(44100)
+                        .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
+                        .setChannelMask(AudioFormat.CHANNEL_OUT_MONO)
+                        .build())
+                .setTransferMode(android.media.AudioTrack.MODE_STREAM)
+                .build();
+
+        AudioInterceptorCallback interceptorCallback = new AudioInterceptorCallback(audioTrack);
+
+        audioTrack.play();
+
+        // Create the JavaAudioDeviceModule with the specified settings
+        audioDeviceModule = JavaAudioDeviceModule.builder(context)
+                .setUseHardwareAcousticEchoCanceler(isDeviceSupportHWAec)
+                .setUseHardwareNoiseSuppressor(isDeviceSupportHWNs)
+                .setSamplesReadyCallback(interceptorCallback)
+                .createAudioDeviceModule();
+      }
+    } catch (Exception error) {
+      Log.w(TAG, error.toString());
+    }
+
 
     if (!isDeviceSupportHWAec) {
       WebRtcAudioUtils.setWebRtcBasedAcousticEchoCanceler(true);

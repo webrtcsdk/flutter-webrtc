@@ -17,7 +17,6 @@ import android.hardware.camera2.CameraDevice;
 import android.hardware.camera2.CameraManager;
 import android.hardware.camera2.CaptureRequest;
 import android.media.AudioDeviceInfo;
-import android.media.AudioFormat;
 import android.media.AudioManager;
 import android.media.projection.MediaProjection;
 import android.media.projection.MediaProjectionManager;
@@ -39,7 +38,6 @@ import androidx.annotation.Nullable;
 import androidx.annotation.RequiresApi;
 
 import com.cloudwebrtc.webrtc.audio.AudioSwitchManager;
-import com.cloudwebrtc.webrtc.audio.RNNoiseProcessor;
 import com.cloudwebrtc.webrtc.record.AudioChannel;
 import com.cloudwebrtc.webrtc.record.AudioSamplesInterceptor;
 import com.cloudwebrtc.webrtc.record.MediaRecorderImpl;
@@ -70,12 +68,9 @@ import org.webrtc.VideoCapturer;
 import org.webrtc.VideoSource;
 import org.webrtc.VideoTrack;
 import org.webrtc.audio.JavaAudioDeviceModule;
-import org.webrtc.audio.WebRtcAudioTrackUtils;
 
 import java.io.File;
 import java.lang.reflect.Field;
-import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -388,16 +383,6 @@ class GetUserMediaImpl {
 
         AudioTrack track = pcFactory.createAudioTrack(trackId, audioSource);
         stream.addTrack(track);
-
-        // Start RNNoise
-        if (VERSION.SDK_INT >= VERSION_CODES.M) {
-            RNNoiseProcessor rnNoiseProcessor = new RNNoiseProcessor();
-            try {
-                rnNoiseProcessor.startProcessing(audioDeviceModule);
-            } catch (NoSuchFieldException | IllegalAccessException e) {
-                throw new RuntimeException(e);
-            }
-        }
 
         stateProvider.putLocalTrack(track.id(), track);
 
