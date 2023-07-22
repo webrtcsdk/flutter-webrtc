@@ -39,9 +39,9 @@ import androidx.annotation.Nullable;
 import androidx.annotation.RequiresApi;
 
 import com.cloudwebrtc.webrtc.audio.AudioSwitchManager;
+import com.cloudwebrtc.webrtc.audio.RNNoiseProcessor;
 import com.cloudwebrtc.webrtc.record.AudioChannel;
 import com.cloudwebrtc.webrtc.record.AudioSamplesInterceptor;
-import com.cloudwebrtc.webrtc.record.AudioTrackInterceptor;
 import com.cloudwebrtc.webrtc.record.MediaRecorderImpl;
 import com.cloudwebrtc.webrtc.record.OutputAudioSamplesInterceptor;
 import com.cloudwebrtc.webrtc.utils.Callback;
@@ -51,7 +51,6 @@ import com.cloudwebrtc.webrtc.utils.EglUtils;
 import com.cloudwebrtc.webrtc.utils.MediaConstraintsUtils;
 import com.cloudwebrtc.webrtc.utils.ObjectType;
 import com.cloudwebrtc.webrtc.utils.PermissionUtils;
-import com.cloudwebrtc.webrtc.utils.RNNoiseWrapper;
 
 import org.webrtc.AudioSource;
 import org.webrtc.AudioTrack;
@@ -71,6 +70,7 @@ import org.webrtc.VideoCapturer;
 import org.webrtc.VideoSource;
 import org.webrtc.VideoTrack;
 import org.webrtc.audio.JavaAudioDeviceModule;
+import org.webrtc.audio.WebRtcAudioTrackUtils;
 
 import java.io.File;
 import java.lang.reflect.Field;
@@ -118,9 +118,7 @@ class GetUserMediaImpl {
     private final SparseArray<MediaRecorderImpl> mediaRecorders = new SparseArray<>();
     private AudioDeviceInfo preferredInput = null;
 
-    private FlutterRTCVirtualBackground flutterRTCVirtualBackground = null;
-
-    private AudioTrackInterceptor audioTrackInterceptor = null;
+    private final FlutterRTCVirtualBackground flutterRTCVirtualBackground;
 
     public void screenRequestPermissions(ResultReceiver resultReceiver) {
         final Activity activity = stateProvider.getActivity();
@@ -372,7 +370,7 @@ class GetUserMediaImpl {
 
         if(deviceId == null) {
             AudioDeviceInfo[] devices = new AudioDeviceInfo[0];
-            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
+            if (VERSION.SDK_INT >= VERSION_CODES.M) {
                 devices = audioManager.getDevices(AudioManager.GET_DEVICES_INPUTS);
             }
             if(devices.length > 0) {
@@ -388,36 +386,18 @@ class GetUserMediaImpl {
         //     }
         // }
 
-        AudioTrack track =  pcFactory.createAudioTrack(trackId, audioSource);
-
-        // RNNoise
-        RNNoiseWrapper rnNoiseWrapper = new RNNoiseWrapper();
-        rnNoiseWrapper.init();
-
-        // Create the audio track with the desired audio constraints
-        android.media.AudioTrack audioTrack = createAudioTrackWithConstraints(audioConstraints);
-        // Create the audio track interceptor
-        audioTrackInterceptor = new AudioTrackInterceptor(audioTrack, new JavaAudioDeviceModule.SamplesReadyCallback() {
-            @Override
-            public void onWebRtcAudioRecordSamplesReady(JavaAudioDeviceModule.AudioSamples audioSamples) {
-                // Process audio with RNNoiseWrapper
-                byte[] audioDataBytes = audioSamples.getData();
-                short[] audioDataShorts = bytesToShorts(audioDataBytes);
-                short[] processedAudioData = rnNoiseWrapper.processAudio(audioDataShorts);
-
-                // Convert the processed audio data back to bytes
-                byte[] processedAudioBytes = shortsToBytes(processedAudioData);
-
-                if (audioTrackInterceptor != null) {
-                    // Write the processed audio data to the audio track
-                    Log.d(TAG, "Removed Background Noise by RNNoise");
-                    audioTrackInterceptor.write(processedAudioBytes, 0, processedAudioBytes.length);
-                }
-            }
-        });
-
-
+        AudioTrack track = pcFactory.createAudioTrack(trackId, audioSource);
         stream.addTrack(track);
+
+        // Start RNNoise
+        if (VERSION.SDK_INT >= VERSION_CODES.M) {
+            RNNoiseProcessor rnNoiseProcessor = new RNNoiseProcessor();
+            try {
+                rnNoiseProcessor.startProcessing(audioDeviceModule);
+            } catch (NoSuchFieldException | IllegalAccessException e) {
+                throw new RuntimeException(e);
+            }
+        }
 
         stateProvider.putLocalTrack(track.id(), track);
 
@@ -446,41 +426,6 @@ class GetUserMediaImpl {
         trackParams.putMap("settings", settings.toMap());
 
         return trackParams;
-    }
-
-    // Helper method to create AudioTrack with desired audio constraints
-    private android.media.AudioTrack createAudioTrackWithConstraints(MediaConstraints audioConstraints) {
-        int sampleRate = 44100; // Your desired sample rate
-        int channelConfig = AudioFormat.CHANNEL_OUT_MONO; // Mono channel
-        int audioFormat = AudioFormat.ENCODING_PCM_16BIT; // 16-bit PCM
-        int bufferSize = android.media.AudioTrack.getMinBufferSize(sampleRate, channelConfig, audioFormat);
-
-        android.media.AudioTrack audioTrack = new android.media.AudioTrack(
-                AudioManager.STREAM_VOICE_CALL,
-                sampleRate,
-                channelConfig,
-                audioFormat,
-                bufferSize,
-                android.media.AudioTrack.MODE_STREAM
-        );
-
-        return audioTrack;
-    }
-
-
-
-    // Helper method to convert byte[] to short[]
-    private short[] bytesToShorts(byte[] bytes) {
-        short[] shorts = new short[bytes.length / 2];
-        ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN).asShortBuffer().get(shorts);
-        return shorts;
-    }
-
-    // Helper method to convert short[] to byte[]
-    private byte[] shortsToBytes(short[] shorts) {
-        byte[] bytes = new byte[shorts.length * 2];
-        ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN).asShortBuffer().put(shorts);
-        return bytes;
     }
 
     /**

@@ -1,45 +1,45 @@
-cmake_minimum_required(VERSION 3.10.2)
+# Định nghĩa biến cho đường dẫn của NDK
+set(NDK_PATH /Users/lambiengcode/Library/Android/sdk/ndk/24.0.8215888)
 
-#rnnoise
-add_library(rnnoise STATIC
+# Set the minimum required CMake version
+cmake_minimum_required(VERSION 3.18)
+
+set(CMAKE_CXX_FLAGS "-std=c++17 -DANDROID -g")
+
+# Set the name of your project
+project(rnnoise)
+
+# Add the source files for rnnoise
+add_library(rnnoise SHARED
         rnnoise/src/celt_lpc.c
         rnnoise/src/denoise.c
         rnnoise/src/kiss_fft.c
         rnnoise/src/pitch.c
         rnnoise/src/rnn_data.c
         rnnoise/src/rnn_reader.c
-        rnnoise/src/rnn_reader.c
-        rnnoise/src/rnn.c)
+        rnnoise/src/rnn.c
+        rnnoise_wrapper.c)
+
+# Set compiler flags if needed
 target_compile_options(rnnoise PUBLIC
         -Wall -finline-functions -fno-strict-aliasing -O3 -frtti -Wno-unknown-pragmas -funroll-loops -fexceptions -fno-math-errno)
+
+# Set target properties
 set_target_properties(rnnoise PROPERTIES
-        ANDROID_ARM_MODE arm)
+    ANDROID_ARM_MODE arm
+    OUTPUT_NAME "rnnoise"
+    SUFFIX ".so")
+
+# Define compile definitions
 target_compile_definitions(rnnoise PRIVATE
-        HAVE_PTHREAD __STDC_LIMIT_MACROS BSD=1 USE_KISS_FFT NULL=0 SOCKLEN_T=socklen_t LOCALE_NOT_USED _LARGEFILE_SOURCE=1 _FILE_OFFSET_BITS=64 restrict= __EMX__ OPUS_BUILD USE_ALLOCA HAVE_LRINT HAVE_LRINTF
-        _celt_autocorr=rnnoise__celt_autocorr
-        celt_fir=rnnoise_celt_fir
-        celt_iir=rnnoise_celt_iir
-        _celt_lpc=rnnoise__celt_lpc
-        celt_pitch_xcorr=rnnoise_celt_pitch_xcorr
-        compute_band_corr=rnnoise_compute_band_corr
-        compute_band_energy=rnnoise_compute_band_energy
-        compute_dense=rnnoise_compute_dense
-        compute_gru=rnnoise_compute_gru
-        compute_rnn=rnnoise_compute_rnn
-        interp_band_gain=rnnoise_interp_band_gain
-        opus_fft_alloc=rnnoise_opus_fft_alloc
-        opus_fft_alloc_arch_c=rnnoise_opus_fft_alloc_arch_c
-        opus_fft_alloc_twiddles=rnnoise_opus_fft_alloc_twiddles
-        opus_fft_c=rnnoise_opus_fft_c
-        opus_fft_free=rnnoise_opus_fft_free
-        opus_fft_free_arch_c=rnnoise_opus_fft_free_arch_c
-        opus_fft_impl=rnnoise_opus_fft_impl
-        opus_ifft_c=rnnoise_opus_ifft_c
-        pitch_downsample=rnnoise_pitch_downsample
-        pitch_filter=rnnoise_pitch_filter
-        pitch_search=rnnoise_pitch_search
-        remove_doubling=rnnoise_remove_doubling)
-target_compile_definitions(rnnoise PUBLIC
-        WEBRTC_HAVE_DCSCTP RTC_DISABLE_TRACE_EVENTS WEBRTC_OPUS_SUPPORT_120MS_PTIME=1 BWE_TEST_LOGGING_COMPILE_TIME_ENABLE=0 ABSL_ALLOCATOR_NOTHROW=1 RTC_ENABLE_VP9 WEBRTC_POSIX WEBRTC_LINUX WEBRTC_ANDROID WEBRTC_USE_H264 NDEBUG WEBRTC_HAVE_USRSCTP WEBRTC_HAVE_SCTP WEBRTC_APM_DEBUG_DUMP=0 WEBRTC_USE_BUILTIN_ISAC_FLOAT WEBRTC_OPUS_VARIABLE_COMPLEXITY=0 HAVE_NETINET_IN_H WEBRTC_INCLUDE_INTERNAL_AUDIO_DEVICE __Userspace__ SCTP_SIMPLE_ALLOCATOR SCTP_PROCESS_LEVEL_LOCKS __Userspace_os_Linux)
+        # Add your compile definitions here
+)
+
+# Set include directories, including the NDK path
 target_include_directories(rnnoise PUBLIC
-        rnnoise/include)
+        rnnoise/include
+        ${NDK_PATH}/sysroot/usr/include)
+
+# Specify where to place the built library
+set_target_properties(rnnoise PROPERTIES
+        ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/jniLibs/${ANDROID_ABI})

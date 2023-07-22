@@ -21,7 +21,8 @@
       "toolchain": "toolchain",
       "abi": "x86",
       "artifactName": "rnnoise",
-      "output": "/Users/lambiengcode/Documents/webrtc/flutter-webrtc/android/.cxx/Debug/106x6d2u/x86/librnnoise.a"
+      "output": "/Users/lambiengcode/Documents/webrtc/flutter-webrtc/example/build/flutter_webrtc/intermediates/cxx/Debug/106x6d2u/obj/x86/librnnoise.so",
+      "runtimeFiles": []
     }
   },
   "toolchains": {
