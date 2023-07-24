@@ -1,6 +1,5 @@
 package com.cloudwebrtc.webrtc
 
-import android.os.Build
 import org.webrtc.EglBase
 import org.webrtc.HardwareVideoEncoderFactory
 import org.webrtc.SimulcastVideoEncoderFactory

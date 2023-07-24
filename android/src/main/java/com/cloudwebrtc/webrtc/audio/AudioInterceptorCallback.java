@@ -1,9 +1,7 @@
 package com.cloudwebrtc.webrtc.audio;
 
 import android.media.AudioTrack;
-import android.util.Log;
 
-import com.cloudwebrtc.webrtc.record.AudioTrackInterceptor;
 import com.cloudwebrtc.webrtc.utils.RNNoiseWrapper;
 
 import org.webrtc.audio.JavaAudioDeviceModule;

@@ -1,10 +1,12 @@
 package com.cloudwebrtc.webrtc.utils;
 
 import android.util.Log;
-import java.util.List;
-import java.util.Map.Entry;
+
 import org.webrtc.MediaConstraints;
 import org.webrtc.MediaConstraints.KeyValuePair;
+
+import java.util.List;
+import java.util.Map.Entry;
 
 public class MediaConstraintsUtils {
 
