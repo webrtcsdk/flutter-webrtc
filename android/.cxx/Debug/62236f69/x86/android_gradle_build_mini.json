@@ -1,0 +1,33 @@
+{
+  "buildFiles": [
+    "/Users/lambiengcode/Documents/webrtc/flutter-webrtc/android/jni/CMakeLists.txt"
+  ],
+  "cleanCommandsComponents": [
+    [
+      "/Users/lambiengcode/Library/Android/sdk/cmake/3.22.1/bin/ninja",
+      "-C",
+      "/Users/lambiengcode/Documents/webrtc/flutter-webrtc/android/.cxx/Debug/62236f69/x86",
+      "clean"
+    ]
+  ],
+  "buildTargetsCommandComponents": [
+    "/Users/lambiengcode/Library/Android/sdk/cmake/3.22.1/bin/ninja",
+    "-C",
+    "/Users/lambiengcode/Documents/webrtc/flutter-webrtc/android/.cxx/Debug/62236f69/x86",
+    "{LIST_OF_TARGETS_TO_BUILD}"
+  ],
+  "libraries": {
+    "cpufeatures::@6890427a1f51a3e7e1df": {
+      "artifactName": "cpufeatures",
+      "abi": "x86",
+      "output": "/Users/lambiengcode/Documents/webrtc/flutter-webrtc/android/.cxx/Debug/62236f69/x86/libcpufeatures.a",
+      "runtimeFiles": []
+    },
+    "rnnoise::@6890427a1f51a3e7e1df": {
+      "artifactName": "rnnoise",
+      "abi": "x86",
+      "output": "/Users/lambiengcode/Documents/webrtc/flutter-webrtc/example/build/flutter_webrtc/intermediates/cxx/Debug/62236f69/obj/x86/librnnoise.so",
+      "runtimeFiles": []
+    }
+  }
+}

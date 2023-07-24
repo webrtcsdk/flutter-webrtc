@@ -159,4 +159,16 @@ class Helper {
 
     await WebRTC.invokeMethod("disableVirtualBackground");
   }
+
+  static Future<void> enableRNNoise() async {
+    if (!WebRTC.platformIsAndroid) return;
+
+    await WebRTC.invokeMethod("enableRNNoise");
+  }
+
+  static Future<void> disableRNNoise() async {
+    if (!WebRTC.platformIsAndroid) return;
+
+    await WebRTC.invokeMethod("disableRNNoise");
+  }
 }

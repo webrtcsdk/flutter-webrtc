@@ -1,7 +1,12 @@
 package org.webrtc.audio;
 
+import android.media.AudioAttributes;
+import android.media.AudioFormat;
 import android.media.AudioTrack;
+import android.os.Build;
 import android.util.Log;
+
+import androidx.annotation.RequiresApi;
 
 import com.cloudwebrtc.webrtc.record.AudioTrackInterceptor;
 
@@ -19,7 +24,7 @@ public abstract class WebRtcAudioTrackUtils {
 
     public static void attachOutputCallback(
             SamplesReadyCallback callback,
-            JavaAudioDeviceModule audioDeviceModule
+            AudioDeviceModule audioDeviceModule
     ) throws NoSuchFieldException, IllegalAccessException, NullPointerException {
         Field audioOutputField = audioDeviceModule.getClass().getDeclaredField("audioOutput");
         audioOutputField.setAccessible(true);

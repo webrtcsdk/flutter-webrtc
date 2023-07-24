@@ -27,7 +27,7 @@ apply plugin: 'kotlin-android'
 android {
     compileSdkVersion 33
     buildToolsVersion '33.0.0'
-    ndkVersion "24.0.8215888"
+    ndkVersion "20.1.5948944"
 
     if (project.android.hasProperty("namespace")) {
         namespace 'com.cloudwebrtc.webrtc'
@@ -52,6 +52,12 @@ android {
                 arguments '-DANDROID_STL=c++_static', '-DANDROID_PLATFORM=android-16'
             }
         }
+
+        // Configure NDK to use .so files
+        ndk {
+            // Change the libs path if necessary
+            abiFilters 'armeabi-v7a', 'arm64-v8a' // Ensure you select the ABI versions you have compiled
+        }
     }
 
     lintOptions {
@@ -71,14 +77,14 @@ android {
 dependencies {
     implementation 'io.github.webrtc-sdk:android:114.5735.02'
     implementation 'com.twilio:audioswitch:1.1.8'
-    implementation 'androidx.annotation:annotation:1.1.0'
+    implementation 'androidx.annotation:annotation:1.6.0'
     implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk7:$kotlin_version"
 
     // ML Kit
-    implementation 'com.google.mlkit:segmentation-selfie:16.0.0-beta3'
+    implementation 'com.google.mlkit:segmentation-selfie:16.0.0-beta4'
 
     // Libyuv
     implementation "io.github.crow-misia.libyuv:libyuv-android:0.28.0"
-    implementation 'androidx.camera:camera-core:1.0.2'
+    implementation 'androidx.camera:camera-core:1.2.3'
     // implementation files('libwebrtc.aar')
 }

@@ -1,8 +1,9 @@
 package com.cloudwebrtc.webrtc;
 
-import android.util.Log;
-
 import androidx.annotation.NonNull;
+
+import com.cloudwebrtc.webrtc.utils.AnyThreadSink;
+import com.cloudwebrtc.webrtc.utils.ConstraintsMap;
 
 import org.webrtc.FrameCryptor;
 import org.webrtc.FrameCryptorAlgorithm;
@@ -19,12 +20,7 @@ import java.util.UUID;
 import io.flutter.plugin.common.BinaryMessenger;
 import io.flutter.plugin.common.EventChannel;
 import io.flutter.plugin.common.MethodCall;
-import io.flutter.plugin.common.MethodChannel.MethodCallHandler;
 import io.flutter.plugin.common.MethodChannel.Result;
-
-import com.cloudwebrtc.webrtc.utils.AnyThreadSink;
-import com.cloudwebrtc.webrtc.utils.ConstraintsMap;
-import com.cloudwebrtc.webrtc.utils.ConstraintsArray;
 
 public class FlutterRTCFrameCryptor {
 

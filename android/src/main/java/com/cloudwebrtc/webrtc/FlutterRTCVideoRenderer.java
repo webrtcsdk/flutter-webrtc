@@ -1,18 +1,18 @@
 package com.cloudwebrtc.webrtc;
 
-import android.util.Log;
 import android.graphics.SurfaceTexture;
+import android.util.Log;
 
 import com.cloudwebrtc.webrtc.utils.AnyThreadSink;
 import com.cloudwebrtc.webrtc.utils.ConstraintsMap;
 import com.cloudwebrtc.webrtc.utils.EglUtils;
 
-import java.util.List;
-
 import org.webrtc.EglBase;
 import org.webrtc.MediaStream;
 import org.webrtc.RendererCommon.RendererEvents;
 import org.webrtc.VideoTrack;
+
+import java.util.List;
 
 import io.flutter.plugin.common.EventChannel;
 import io.flutter.view.TextureRegistry;

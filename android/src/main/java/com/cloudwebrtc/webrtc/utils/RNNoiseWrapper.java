@@ -7,4 +7,5 @@ public class RNNoiseWrapper {
 
     public native void init();
     public native short[] processAudio(short[] audioData);
+    public native void dispose();
 }

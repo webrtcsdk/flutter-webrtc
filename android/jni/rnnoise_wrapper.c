@@ -3,11 +3,16 @@
 
 static DenoiseState *rnnoise;
 
-#define FRAME_SIZE 480
+#define FRAME_SIZE 720
 
 JNIEXPORT void JNICALL
 Java_com_cloudwebrtc_webrtc_utils_RNNoiseWrapper_init(JNIEnv *env, jobject instance) {
     rnnoise = rnnoise_create(NULL);
+}
+
+JNIEXPORT void JNICALL
+Java_com_cloudwebrtc_webrtc_utils_RNNoiseWrapper_dispose(JNIEnv *env, jobject instance) {
+    rnnoise_destroy(rnnoise);
 }
 
 JNIEXPORT jshortArray JNICALL
