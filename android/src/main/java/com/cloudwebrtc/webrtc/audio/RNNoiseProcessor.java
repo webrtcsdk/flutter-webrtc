@@ -22,7 +22,7 @@ public class RNNoiseProcessor {
     private static final int NUM_CHANNELS = 2;
     private static final int CHANNEL_CONFIG = (NUM_CHANNELS == 1) ? AudioFormat.CHANNEL_IN_MONO : AudioFormat.CHANNEL_IN_STEREO;
     private static final int AUDIO_FORMAT = AudioFormat.ENCODING_PCM_16BIT;
-    private static final int BUFFER_SIZE = 128;
+    private static final int BUFFER_SIZE = AudioRecord.getMinBufferSize(SAMPLE_RATE, CHANNEL_CONFIG, AUDIO_FORMAT);
 
     private boolean isProcessing = false;
     private HandlerThread processingThread;
