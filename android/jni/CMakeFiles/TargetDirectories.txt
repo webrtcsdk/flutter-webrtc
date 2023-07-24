@@ -1,0 +1,3 @@
+/Users/lambiengcode/Documents/webrtc/flutter-webrtc/android/jni/CMakeFiles/rnnoise.dir
+/Users/lambiengcode/Documents/webrtc/flutter-webrtc/android/jni/CMakeFiles/edit_cache.dir
+/Users/lambiengcode/Documents/webrtc/flutter-webrtc/android/jni/CMakeFiles/rebuild_cache.dir

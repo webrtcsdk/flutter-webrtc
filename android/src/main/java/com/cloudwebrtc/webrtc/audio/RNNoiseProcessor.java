@@ -18,17 +18,26 @@ import java.util.Locale;
 
 public class RNNoiseProcessor {
     private static final String TAG = "RNNoiseProcessor";
-    private static final int SAMPLE_RATE = 96000;
-    private static final int NUM_CHANNELS = 2;
+    private static final int SAMPLE_RATE = 48000;
+    private static final int NUM_CHANNELS = 1;
     private static final int CHANNEL_CONFIG = (NUM_CHANNELS == 1) ? AudioFormat.CHANNEL_IN_MONO : AudioFormat.CHANNEL_IN_STEREO;
     private static final int AUDIO_FORMAT = AudioFormat.ENCODING_PCM_16BIT;
     private static final int BUFFER_SIZE = AudioRecord.getMinBufferSize(SAMPLE_RATE, CHANNEL_CONFIG, AUDIO_FORMAT);
+
+    private RNNoiseWrapper rnNoiseWrapper;
 
     private boolean isProcessing = false;
     private HandlerThread processingThread;
     private Handler processingHandler;
 
     public void startProcessing() {
+        if (isProcessing) {
+            return;
+        }
+
+        rnNoiseWrapper = new RNNoiseWrapper();
+        rnNoiseWrapper.init();
+
         isProcessing = true;
 
         processingThread = new HandlerThread("RNNoiseProcessorThread");
@@ -47,10 +56,6 @@ public class RNNoiseProcessor {
                 int audioBufferSize = BUFFER_SIZE * NUM_CHANNELS;
                 byte[] audioBuffer = new byte[audioBufferSize];
                 short[] processedAudioData = new short[audioBufferSize / 2];
-
-                // Initialize the RNNoiseWrapper for noise processing
-                RNNoiseWrapper rnNoiseWrapper = new RNNoiseWrapper();
-                rnNoiseWrapper.init();
 
                 // Start recording from the microphone(s)
                 audioRecord.startRecording();
@@ -74,7 +79,7 @@ public class RNNoiseProcessor {
                     logProcessedAudioSize(processedAudioData);
 
                     // Play back the processed audio
-                    audioTrack.write(audioBuffer, 0, bytesRead * 2);
+                    audioTrack.write(audioBuffer, 0, bytesRead);
                 }
 
                 // Stop and release AudioRecord and AudioTrack
@@ -110,7 +115,12 @@ public class RNNoiseProcessor {
     }
 
     public void stopProcessing() {
+        if (!isProcessing) {
+            return;
+        }
+
         isProcessing = false;
+        rnNoiseWrapper.dispose();
 
         if (processingThread != null) {
             processingThread.quitSafely();

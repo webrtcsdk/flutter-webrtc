@@ -9,3 +9,7 @@
 0	243	1690087038185426054	CMakeFiles/rnnoise.dir/rnnoise/src/denoise.c.o	84d3acbc4a55ed78
 243	277	1690087038219308683	/Users/lambiengcode/Documents/askany_mobile/build/flutter_webrtc/intermediates/cxx/RelWithDebInfo/2g581b64/obj/x86/librnnoise.so	54b430ad3a668605
 2	57	1690096306233333137	/Users/lambiengcode/Documents/askany_mobile/build/flutter_webrtc/intermediates/cxx/RelWithDebInfo/2g581b64/obj/x86/librnnoise.so	54b430ad3a668605
+1	44	1690172528923671704	CMakeFiles/rnnoise.dir/rnnoise_wrapper.c.o	4e26eb3806d2c380
+44	83	1690172528961497616	/Users/lambiengcode/Documents/askany_mobile/build/flutter_webrtc/intermediates/cxx/RelWithDebInfo/2g581b64/obj/x86/librnnoise.so	54b430ad3a668605
+0	41	1690173866304355024	CMakeFiles/rnnoise.dir/rnnoise_wrapper.c.o	4e26eb3806d2c380
+41	81	1690173866343113874	/Users/lambiengcode/Documents/askany_mobile/build/flutter_webrtc/intermediates/cxx/RelWithDebInfo/2g581b64/obj/x86/librnnoise.so	54b430ad3a668605

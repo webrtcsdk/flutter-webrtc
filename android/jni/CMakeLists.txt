@@ -1,10 +1,11 @@
 # Định nghĩa biến cho đường dẫn của NDK
-set(NDK_PATH /Users/lambiengcode/Library/Android/sdk/ndk/24.0.8215888)
+set(NDK_PATH /Users/lambiengcode/Library/Android/sdk/ndk/20.1.5948944)
 
 # Set the minimum required CMake version
 cmake_minimum_required(VERSION 3.18)
 
 set(CMAKE_CXX_FLAGS "-std=c++17 -DANDROID -g")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -ffunction-sections -fdata-sections")
 
 # Set the name of your project
 project(rnnoise)
@@ -35,10 +36,11 @@ target_compile_definitions(rnnoise PRIVATE
         # Add your compile definitions here
 )
 
-# Set include directories, including the NDK path
+# Set include directories, sử dụng biến NDK_PATH
 target_include_directories(rnnoise PUBLIC
         rnnoise/include
-        ${NDK_PATH}/sysroot/usr/include)
+        ${NDK_PATH}/sysroot/usr/include
+        ${NDK_PATH}/sysroot/usr/include/arm-linux-androideabi) # Thêm đường dẫn đến thư mục chứa asm/types.h
 
 # Specify where to place the built library
 set_target_properties(rnnoise PROPERTIES
