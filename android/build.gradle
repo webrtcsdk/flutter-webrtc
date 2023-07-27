@@ -51,11 +51,11 @@ android {
 }
 
 dependencies {
-    implementation 'io.github.webrtc-sdk:android:114.5735.02'
+    // implementation 'io.github.webrtc-sdk:android:114.5735.02'
     implementation 'com.twilio:audioswitch:1.1.8'
     implementation 'androidx.annotation:annotation:1.1.0'
     implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk7:$kotlin_version"
-    // implementation files('libwebrtc.aar')
+    implementation files('libwebrtc.aar')
 
     // ML Kit
     implementation 'com.google.mlkit:segmentation-selfie:16.0.0-beta4'
