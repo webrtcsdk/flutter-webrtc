@@ -43,6 +43,10 @@ class FlutterRTCVirtualBackground {
         .setStreamModeSmoothingRatio(1.0f)
         .build()
     private val segmenter = Segmentation.getClient(segmentOptions)
+    // For storing the previous frames
+    private val previousFrames = mutableListOf<Bitmap>()
+    // Moving Average window size
+    private val windowSize = 5
 
     // MARK: Public functions
 
@@ -257,9 +261,12 @@ class FlutterRTCVirtualBackground {
                 val outputBitmap =
                     drawSegmentedBackground(segmentedBitmap, backgroundBitmap)
 
+                // Apply Moving Average to the outputBitmap
+                val smoothedBitmap = outputBitmap?.let { applyMovingAverage(it) }
+
                 // Create a new VideoFrame from the processed bitmap
                 val yuvConverter = YuvConverter()
-                if (textureHelper != null && textureHelper!!.handler != null) {
+                if (textureHelper != null && textureHelper!!.handler != null && smoothedBitmap != null) {
                     textureHelper!!.handler.post {
                         val textures = IntArray(1)
                         GLES20.glGenTextures(1, textures, 0)
@@ -280,12 +287,12 @@ class FlutterRTCVirtualBackground {
                         GLUtils.texImage2D(
                             GLES20.GL_TEXTURE_2D,
                             0,
-                            outputBitmap,
+                            smoothedBitmap,
                             0
                         )
                         val buffer = TextureBufferImpl(
-                            outputBitmap!!.width,
-                            outputBitmap.height,
+                            smoothedBitmap.width,
+                            smoothedBitmap.height,
                             VideoFrame.TextureBuffer.Type.RGB,
                             textures[0],
                             Matrix(),
@@ -440,6 +447,59 @@ class FlutterRTCVirtualBackground {
         canvas.drawBitmap(segmentedBitmap, 0f, 0f, null)
 
         return outputBitmap
+    }
+
+    /**
+     * Apply the Moving Average filter to the given bitmap.
+     * The previous frames are stored in the `previousFrames` list, and the latest frame is added to the list.
+     * The Moving Average is then calculated using the stored frames.
+     *
+     * @param bitmap The input bitmap to be smoothed with the Moving Average filter.
+     * @return The smoothed bitmap after applying the Moving Average filter.
+     */
+    private fun applyMovingAverage(bitmap: Bitmap): Bitmap {
+        // Add the latest frame to the list
+        previousFrames.add(bitmap)
+
+        // If the list exceeds the window size, remove the oldest frame
+        if (previousFrames.size > windowSize) {
+            previousFrames.removeAt(0)
+        }
+
+        // Calculate the Moving Average for each color channel (red, green, blue, alpha)
+        val newBitmap = Bitmap.createBitmap(bitmap.width, bitmap.height, Bitmap.Config.ARGB_8888)
+        val numFrames = previousFrames.size
+
+        for (y in 0 until bitmap.height) {
+            for (x in 0 until bitmap.width) {
+                var redSum = 0
+                var greenSum = 0
+                var blueSum = 0
+                var alphaSum = 0
+
+                // Sum up the color channels for all frames in the window
+                for (frame in previousFrames) {
+                    val pixelColor = frame.getPixel(x, y)
+                    redSum += Color.red(pixelColor)
+                    greenSum += Color.green(pixelColor)
+                    blueSum += Color.blue(pixelColor)
+                    alphaSum += Color.alpha(pixelColor)
+                }
+
+                // Calculate the average color for the current pixel
+                val newRed = redSum / numFrames
+                val newGreen = greenSum / numFrames
+                val newBlue = blueSum / numFrames
+                val newAlpha = alphaSum / numFrames
+
+                // Set the new color for the current pixel in the newBitmap
+                val newColor = Color.argb(newAlpha, newRed, newGreen, newBlue)
+                newBitmap.setPixel(x, y, newColor)
+            }
+        }
+
+        // Return the smoothed bitmap
+        return newBitmap
     }
 
     /**
