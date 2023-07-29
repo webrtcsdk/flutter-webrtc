@@ -744,7 +744,7 @@ class GetUserMediaImpl {
         VideoSource videoSource = pcFactory.createVideoSource(false);
 
         // Initial RTCVirtualBackground
-        flutterRTCVirtualBackground.initialize(videoSource);
+        flutterRTCVirtualBackground.initialize(applicationContext, videoSource);
 
         String threadName = Thread.currentThread().getName() + "_texture_camera_thread";
         SurfaceTextureHelper surfaceTextureHelper =

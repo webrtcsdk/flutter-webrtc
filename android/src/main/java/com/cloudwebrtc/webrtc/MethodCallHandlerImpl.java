@@ -172,8 +172,8 @@ public class MethodCallHandlerImpl implements MethodCallHandler, StateProvider {
      * Execute any time before creating a LocalAudioTrack and connecting
      * to a Room.
      */
-    Boolean isDeviceSupportHWAec = WebRtcAudioEffects.canUseAcousticEchoCanceler();
-    Boolean isDeviceSupportHWNs = WebRtcAudioEffects.canUseNoiseSuppressor();
+    boolean isDeviceSupportHWAec = WebRtcAudioEffects.canUseAcousticEchoCanceler();
+    boolean isDeviceSupportHWNs = WebRtcAudioEffects.canUseNoiseSuppressor();
 
     audioDeviceModule = JavaAudioDeviceModule.builder(context)
             .setUseHardwareAcousticEchoCanceler(isDeviceSupportHWAec)

@@ -1,5 +1,6 @@
 package com.cloudwebrtc.webrtc
 
+import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Canvas
@@ -10,12 +11,15 @@ import android.graphics.Rect
 import android.graphics.YuvImage
 import android.opengl.GLES20
 import android.opengl.GLUtils
+import android.os.Build
+import android.os.SystemClock
 import android.util.Log
-import com.google.android.gms.tasks.Task
-import com.google.mlkit.vision.common.InputImage
-import com.google.mlkit.vision.segmentation.Segmentation
-import com.google.mlkit.vision.segmentation.SegmentationMask
-import com.google.mlkit.vision.segmentation.selfie.SelfieSegmenterOptions
+import androidx.annotation.RequiresApi
+import com.cloudwebrtc.webrtc.utils.ImageSegmenterHelper
+import com.google.mediapipe.tasks.vision.core.RunningMode
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import org.webrtc.EglBase
 import org.webrtc.SurfaceTextureHelper
 import org.webrtc.TextureBufferImpl
@@ -27,26 +31,22 @@ import org.webrtc.YuvConverter
 import org.webrtc.YuvHelper
 import java.io.ByteArrayOutputStream
 import java.nio.ByteBuffer
+import java.nio.FloatBuffer
 import java.util.Arrays
 import kotlin.math.max
 
 class FlutterRTCVirtualBackground {
     val TAG = FlutterWebRTCPlugin.TAG
 
+    private val scale = 0.25f
+    private val frameSizeProcessing = 225
     private var videoSource: VideoSource? = null
     private var textureHelper: SurfaceTextureHelper? = null
     private var backgroundBitmap: Bitmap? = null
     private var expectConfidence = 0.7
-    private val segmentOptions = SelfieSegmenterOptions.Builder()
-        .setDetectorMode(SelfieSegmenterOptions.STREAM_MODE)
-        .enableRawSizeMask()
-        .setStreamModeSmoothingRatio(1.0f)
-        .build()
-    private val segmenter = Segmentation.getClient(segmentOptions)
-    // For storing the previous frames
-    private val previousFrames = mutableListOf<Bitmap>()
-    // Moving Average window size
-    private val windowSize = 5
+    private var imageSegmentationHelper: ImageSegmenterHelper? = null
+    private var sink: VideoSink? = null
+    private var bitmapMap = HashMap<Long, CacheFrame>()
 
     // MARK: Public functions
 
@@ -55,8 +55,97 @@ class FlutterRTCVirtualBackground {
      *
      * @param videoSource The VideoSource to be used for video capturing.
      */
-    fun initialize(videoSource: VideoSource) {
+    fun initialize(context: Context, videoSource: VideoSource) {
         this.videoSource = videoSource
+        this.imageSegmentationHelper = ImageSegmenterHelper(
+            context = context,
+            runningMode = RunningMode.LIVE_STREAM,
+            imageSegmenterListener = object :
+                ImageSegmenterHelper.SegmenterListener {
+                override fun onError(error: String, errorCode: Int) {
+                    // no-op
+                }
+
+                override fun onResults(resultBundle: ImageSegmenterHelper.ResultBundle) {
+                    val timestampNS = resultBundle.frameTime
+                    val cacheFrame: CacheFrame = bitmapMap[timestampNS] ?: return
+                    bitmapMap.remove(timestampNS)
+
+                    val maskFloat = resultBundle.results
+                    val maskWidth = resultBundle.width
+                    val maskHeight = resultBundle.height
+
+                    val bitmap = cacheFrame.originalBitmap
+                    val mask = convertFloatBufferToByteBuffer(maskFloat)
+
+                    // Convert the buffer to an array of colors
+                    val colors = maskColorsFromByteBuffer(
+                        mask,
+                        maskWidth,
+                        maskHeight,
+                        bitmap,
+                        bitmap.width,
+                        bitmap.height
+                    )
+
+                    // Create the segmented bitmap from the color array
+                    val segmentedBitmap = createBitmapFromColors(colors, bitmap.width, bitmap.height)
+
+                    if (backgroundBitmap == null) {
+                        // If the background bitmap is null, return without further processing
+                        return
+                    }
+
+//                    val scaledSegmentBitmap = resizeBitmapKeepAspectRatio(segmentedBitmap, max(cacheFrame.originalBitmap.width, cacheFrame.originalBitmap.height))
+
+                    // Draw the segmented bitmap on top of the background for human segments
+                    val outputBitmap = drawSegmentedBackground(segmentedBitmap, backgroundBitmap)
+
+                    // Apply a filter to reduce noise (if applicable)
+                    if (outputBitmap != null) {
+                        // Create a new VideoFrame from the processed bitmap
+                        val yuvConverter = YuvConverter()
+                        if (textureHelper != null && textureHelper!!.handler != null) {
+                            textureHelper!!.handler.post {
+                                val textures = IntArray(1)
+                                GLES20.glGenTextures(1, textures, 0)
+                                GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, textures[0])
+                                GLES20.glTexParameteri(
+                                    GLES20.GL_TEXTURE_2D,
+                                    GLES20.GL_TEXTURE_MIN_FILTER,
+                                    GLES20.GL_NEAREST
+                                )
+                                GLES20.glTexParameteri(
+                                    GLES20.GL_TEXTURE_2D,
+                                    GLES20.GL_TEXTURE_MAG_FILTER,
+                                    GLES20.GL_NEAREST
+                                )
+                                GLUtils.texImage2D(GLES20.GL_TEXTURE_2D, 0, outputBitmap, 0)
+                                val buffer = TextureBufferImpl(
+                                    outputBitmap.width,
+                                    outputBitmap.height,
+                                    VideoFrame.TextureBuffer.Type.RGB,
+                                    textures[0],
+                                    Matrix(),
+                                    textureHelper!!.handler,
+                                    yuvConverter,
+                                    null
+                                )
+                                val i420Buf = yuvConverter.convert(buffer)
+                                if (i420Buf != null) {
+                                    // Create the output VideoFrame and send it to the sink
+                                    val outputVideoFrame =
+                                        VideoFrame(i420Buf, cacheFrame.originalFrame.rotation, cacheFrame.originalFrame.timestampNs)
+                                    sink?.onFrame(outputVideoFrame)
+                                } else {
+                                    // If the conversion fails, send the original frame to the sink
+                                    sink?.onFrame(cacheFrame.originalFrame)
+                                }
+                            }
+                        }
+                    }
+                }
+            })
         setVirtualBackground()
     }
 
@@ -95,8 +184,6 @@ class FlutterRTCVirtualBackground {
 
         // Attach a VideoProcessor to the VideoSource to process captured video frames
         videoSource!!.setVideoProcessor(object : VideoProcessor {
-            private var sink: VideoSink? = null
-
             override fun onCapturerStarted(success: Boolean) {
                 // Handle video capture start event
             }
@@ -105,6 +192,7 @@ class FlutterRTCVirtualBackground {
                 // Handle video capture stop event
             }
 
+            @RequiresApi(Build.VERSION_CODES.N)
             override fun onFrameCaptured(frame: VideoFrame) {
                 if (sink != null) {
                     if (backgroundBitmap == null) {
@@ -122,10 +210,10 @@ class FlutterRTCVirtualBackground {
                 }
             }
 
-            override fun setSink(sink: VideoSink?) {
+            override fun setSink(videoSink: VideoSink?) {
                 // Store the VideoSink to send the processed frame back to WebRTC
                 // The sink will be used after segmentation processing
-                this.sink = sink
+                sink = videoSink
             }
         })
     }
@@ -138,15 +226,15 @@ class FlutterRTCVirtualBackground {
      * @param frame The original VideoFrame metadata for the input bitmap.
      * @param sink The VideoSink to send the processed frame back to WebRTC.
      */
+    @RequiresApi(Build.VERSION_CODES.N)
     private fun runSegmentationInBackground(
         inputFrameBitmap: Bitmap,
         frame: VideoFrame,
         sink: VideoSink
     ) {
-        Thread {
-            // Perform segmentation in the background thread
+        CoroutineScope(Dispatchers.Default).launch {
             processSegmentation(inputFrameBitmap, frame, sink)
-        }.start()
+        }
     }
 
     /**
@@ -223,101 +311,69 @@ class FlutterRTCVirtualBackground {
      * @param original The original video frame for metadata reference (rotation, timestamp, etc.).
      * @param sink The VideoSink to receive the processed video frame.
      */
+    @RequiresApi(Build.VERSION_CODES.N)
     private fun processSegmentation(bitmap: Bitmap, original: VideoFrame, sink: VideoSink) {
-        // Create an InputImage from the input bitmap
-        val inputImage = InputImage.fromBitmap(bitmap, 0)
+        val resizeBitmap = resizeBitmapKeepAspectRatio(bitmap, frameSizeProcessing)
 
-        // Perform segmentation using the AI segmenter
-        val result = segmenter.process(inputImage)
-        result.addOnCompleteListener { task: Task<SegmentationMask> ->
-            if (task.isSuccessful) {
-                // Segmentation process successful
-                val segmentationMask = task.result
-                val mask = segmentationMask.buffer
-                val maskWidth = segmentationMask.width
-                val maskHeight = segmentationMask.height
-                mask.rewind()
+        // Segment the input bitmap using the ImageSegmentationHelper
+        val frameTime: Long = SystemClock.uptimeMillis()
+        bitmapMap[frameTime] = CacheFrame(originalBitmap = resizeBitmap, originalFrame = original)
 
-                // Convert the buffer to an array of colors
-                val colors = maskColorsFromByteBuffer(
-                    mask,
-                    maskWidth,
-                    maskHeight,
-                    bitmap,
-                    bitmap.width,
-                    bitmap.height
-                )
+        imageSegmentationHelper?.segmentLiveStreamFrame(resizeBitmap, frameTime)
+    }
 
-                // Create a segmented bitmap from the array of colors
-                val segmentedBitmap =
-                    createBitmapFromColors(colors, bitmap.width, bitmap.height)
+    private fun resizeBitmap(bitmap: Bitmap, scaleFactory: Float): Bitmap {
+        val newWidth = (bitmap.width * scaleFactory).toInt()
+        val newHeight = (bitmap.height * scaleFactory).toInt()
 
+        return Bitmap.createScaledBitmap(bitmap, newWidth, newHeight, false)
+    }
 
-                if (backgroundBitmap == null) {
-                    return@addOnCompleteListener
-                }
+    /**
+     * Resize the given bitmap while maintaining its original aspect ratio.
+     *
+     * @param bitmap The bitmap to be resized.
+     * @param maxSize The maximum size (width or height) of the resized bitmap.
+     * @return The resized bitmap while keeping its original aspect ratio.
+     */
+    private fun resizeBitmapKeepAspectRatio(bitmap: Bitmap, maxSize: Int): Bitmap {
+        val originalWidth = bitmap.width
+        val originalHeight = bitmap.height
 
-                // Draw the segmented bitmap on top of the background
-                val outputBitmap =
-                    drawSegmentedBackground(segmentedBitmap, backgroundBitmap)
-
-                // Apply Moving Average to the outputBitmap
-                val smoothedBitmap = outputBitmap?.let { applyMovingAverage(it) }
-
-                // Create a new VideoFrame from the processed bitmap
-                val yuvConverter = YuvConverter()
-                if (textureHelper != null && textureHelper!!.handler != null && smoothedBitmap != null) {
-                    textureHelper!!.handler.post {
-                        val textures = IntArray(1)
-                        GLES20.glGenTextures(1, textures, 0)
-                        GLES20.glBindTexture(
-                            GLES20.GL_TEXTURE_2D,
-                            textures[0]
-                        )
-                        GLES20.glTexParameteri(
-                            GLES20.GL_TEXTURE_2D,
-                            GLES20.GL_TEXTURE_MIN_FILTER,
-                            GLES20.GL_NEAREST
-                        )
-                        GLES20.glTexParameteri(
-                            GLES20.GL_TEXTURE_2D,
-                            GLES20.GL_TEXTURE_MAG_FILTER,
-                            GLES20.GL_NEAREST
-                        )
-                        GLUtils.texImage2D(
-                            GLES20.GL_TEXTURE_2D,
-                            0,
-                            smoothedBitmap,
-                            0
-                        )
-                        val buffer = TextureBufferImpl(
-                            smoothedBitmap.width,
-                            smoothedBitmap.height,
-                            VideoFrame.TextureBuffer.Type.RGB,
-                            textures[0],
-                            Matrix(),
-                            textureHelper!!.handler,
-                            yuvConverter,
-                            null
-                        )
-                        val i420Buf = yuvConverter.convert(buffer)
-                        if (i420Buf != null) {
-                            val outputVideoFrame = VideoFrame(
-                                i420Buf,
-                                original.rotation,
-                                original.timestampNs
-                            )
-                            sink.onFrame(outputVideoFrame)
-                        }
-                    }
-                }
-            } else {
-                // Handle segmentation error
-                val error = task.exception
-                // Log error information
-                Log.d(TAG, "Segmentation error: " + error.toString())
-            }
+        // Check the current size of the image and return if it doesn't exceed the maxSize
+        if (originalWidth <= maxSize && originalHeight <= maxSize) {
+            return bitmap
         }
+
+        // Determine whether to maintain width or height to keep the original aspect ratio
+        val scaleFactor: Float = if (originalWidth >= originalHeight) {
+            maxSize.toFloat() / originalWidth
+        } else {
+            maxSize.toFloat() / originalHeight
+        }
+
+        // Calculate the new size of the image while maintaining the original aspect ratio
+        val newWidth = (originalWidth * scaleFactor).toInt()
+        val newHeight = (originalHeight * scaleFactor).toInt()
+
+        // Create a new bitmap with the scaled size while preserving the aspect ratio
+        return Bitmap.createScaledBitmap(bitmap, newWidth, newHeight, true)
+    }
+
+    private fun convertFloatBufferToByteBuffer(floatBuffer: FloatBuffer): ByteBuffer {
+        // Calculate the number of bytes needed for the ByteBuffer
+        val bufferSize = floatBuffer.remaining() * 4 // 4 bytes per float
+
+        // Create a new ByteBuffer with the calculated size
+        val byteBuffer = ByteBuffer.allocateDirect(bufferSize)
+
+        // Transfer the data from the FloatBuffer to the ByteBuffer
+        byteBuffer.asFloatBuffer().put(floatBuffer)
+
+        // Reset the position of the ByteBuffer to 0
+        byteBuffer.position(0)
+
+        return byteBuffer
     }
 
     /**
@@ -366,7 +422,7 @@ class FlutterRTCVirtualBackground {
                     var newRed: Int
                     var newGreen: Int
                     var newBlue: Int
-                    if (foregroundConfidence >= expectConfidence) {
+                    if (foregroundConfidence < expectConfidence) {
                         // Foreground uses color from the original bitmap
                         newAlpha = alpha
                         newRed = red
@@ -450,56 +506,69 @@ class FlutterRTCVirtualBackground {
     }
 
     /**
-     * Apply the Moving Average filter to the given bitmap.
-     * The previous frames are stored in the `previousFrames` list, and the latest frame is added to the list.
-     * The Moving Average is then calculated using the stored frames.
+     * Apply Mean Filter to the given bitmap with the specified kernel size.
+     * The Mean Filter is a simple image processing filter that smoothens the image by
+     * replacing each pixel value with the average value of its neighboring pixels.
      *
-     * @param bitmap The input bitmap to be smoothed with the Moving Average filter.
-     * @return The smoothed bitmap after applying the Moving Average filter.
+     * @param bitmap The bitmap to be processed.
+     * @param kernelSize The size of the square kernel (odd number) for the filter. For example, 3, 5, 7, etc.
+     * @return The bitmap after applying the Mean Filter.
      */
-    private fun applyMovingAverage(bitmap: Bitmap): Bitmap {
-        // Add the latest frame to the list
-        previousFrames.add(bitmap)
+    fun meanFilter(bitmap: Bitmap, kernelSize: Int): Bitmap {
+        val width = bitmap.width
+        val height = bitmap.height
 
-        // If the list exceeds the window size, remove the oldest frame
-        if (previousFrames.size > windowSize) {
-            previousFrames.removeAt(0)
-        }
+        // Create a new output bitmap with the same dimensions as the input bitmap
+        val outputBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
 
-        // Calculate the Moving Average for each color channel (red, green, blue, alpha)
-        val newBitmap = Bitmap.createBitmap(bitmap.width, bitmap.height, Bitmap.Config.ARGB_8888)
-        val numFrames = previousFrames.size
-
-        for (y in 0 until bitmap.height) {
-            for (x in 0 until bitmap.width) {
-                var redSum = 0
-                var greenSum = 0
-                var blueSum = 0
-                var alphaSum = 0
-
-                // Sum up the color channels for all frames in the window
-                for (frame in previousFrames) {
-                    val pixelColor = frame.getPixel(x, y)
-                    redSum += Color.red(pixelColor)
-                    greenSum += Color.green(pixelColor)
-                    blueSum += Color.blue(pixelColor)
-                    alphaSum += Color.alpha(pixelColor)
+        // Loop through each pixel in the bitmap and apply the Mean Filter
+        for (x in 0 until width) {
+            for (y in 0 until height) {
+                // Collect pixel values within the kernel
+                val kernelPixels = mutableListOf<Int>()
+                for (i in -kernelSize / 2..kernelSize / 2) {
+                    for (j in -kernelSize / 2..kernelSize / 2) {
+                        val pixelX = x + i
+                        val pixelY = y + j
+                        if (pixelX in 0 until width && pixelY in 0 until height) {
+                            kernelPixels.add(bitmap.getPixel(pixelX, pixelY))
+                        }
+                    }
                 }
 
-                // Calculate the average color for the current pixel
-                val newRed = redSum / numFrames
-                val newGreen = greenSum / numFrames
-                val newBlue = blueSum / numFrames
-                val newAlpha = alphaSum / numFrames
+                // Calculate the average value of the pixels in the kernel
+                val avgColor = calculateAverageColor(kernelPixels)
 
-                // Set the new color for the current pixel in the newBitmap
-                val newColor = Color.argb(newAlpha, newRed, newGreen, newBlue)
-                newBitmap.setPixel(x, y, newColor)
+                // Set the average color as the new color of the pixel in the output bitmap
+                outputBitmap.setPixel(x, y, avgColor)
             }
         }
 
-        // Return the smoothed bitmap
-        return newBitmap
+        return outputBitmap
+    }
+
+    /**
+     * Calculate the average color from the given list of pixel colors.
+     *
+     * @param colors The list of pixel colors.
+     * @return The average color calculated from the list of pixel colors.
+     */
+    private fun calculateAverageColor(colors: List<Int>): Int {
+        var sumRed = 0
+        var sumGreen = 0
+        var sumBlue = 0
+
+        for (color in colors) {
+            sumRed += color shr 16 and 0xFF
+            sumGreen += color shr 8 and 0xFF
+            sumBlue += color and 0xFF
+        }
+
+        val avgRed = sumRed / colors.size
+        val avgGreen = sumGreen / colors.size
+        val avgBlue = sumBlue / colors.size
+
+        return (avgRed shl 16) or (avgGreen shl 8) or avgBlue or (0xFF shl 24)
     }
 
     /**
@@ -514,3 +583,8 @@ class FlutterRTCVirtualBackground {
         return Bitmap.createBitmap(colors, width, height, Bitmap.Config.ARGB_8888)
     }
 }
+
+data class CacheFrame(
+    val originalBitmap: Bitmap,
+    val originalFrame: VideoFrame,
+)
