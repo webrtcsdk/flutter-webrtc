@@ -33,9 +33,9 @@ import com.google.mediapipe.tasks.vision.imagesegmenter.ImageSegmenterResult
 import java.nio.FloatBuffer
 
 class ImageSegmenterHelper(
-    var currentDelegate: Int = DELEGATE_CPU,
+    var currentDelegate: Int = DELEGATE_GPU,
     var runningMode: RunningMode = RunningMode.IMAGE,
-    var currentModel: Int = MODEL_SELFIE_MULTICLASS,
+    var currentModel: Int = MODEL_SELFIE_SEGMENTER,
     val context: Context,
     var imageSegmenterListener: SegmenterListener? = null
 ) {

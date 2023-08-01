@@ -69,4 +69,7 @@ dependencies {
 
     // ML Kit
     implementation 'com.google.mediapipe:tasks-vision:latest.release'
+
+    implementation 'com.google.android.gms:play-services-tflite-java:16.1.0'
+    implementation 'com.google.android.gms:play-services-tflite-gpu:16.2.0'
 }

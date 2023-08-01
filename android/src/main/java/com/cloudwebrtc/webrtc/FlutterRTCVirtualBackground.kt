@@ -16,6 +16,9 @@ import android.os.SystemClock
 import android.util.Log
 import androidx.annotation.RequiresApi
 import com.cloudwebrtc.webrtc.utils.ImageSegmenterHelper
+import com.google.android.gms.tflite.client.TfLiteInitializationOptions
+import com.google.android.gms.tflite.gpu.support.TfLiteGpu
+import com.google.android.gms.tflite.java.TfLite
 import com.google.mediapipe.tasks.vision.core.RunningMode
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -56,6 +59,16 @@ class FlutterRTCVirtualBackground {
      * @param videoSource The VideoSource to be used for video capturing.
      */
     fun initialize(context: Context, videoSource: VideoSource) {
+        // Enable GPU
+        val useGpuTask = TfLiteGpu.isGpuDelegateAvailable(context)
+
+        val interpreterTask = useGpuTask.continueWith { useGpuTask ->
+            TfLite.initialize(context,
+                TfLiteInitializationOptions.builder()
+                    .setEnableGpuDelegateSupport(useGpuTask.result)
+                    .build())
+        }
+
         this.videoSource = videoSource
         this.imageSegmentationHelper = ImageSegmenterHelper(
             context = context,
@@ -95,8 +108,6 @@ class FlutterRTCVirtualBackground {
                         // If the background bitmap is null, return without further processing
                         return
                     }
-
-//                    val scaledSegmentBitmap = resizeBitmapKeepAspectRatio(segmentedBitmap, max(cacheFrame.originalBitmap.width, cacheFrame.originalBitmap.height))
 
                     // Draw the segmented bitmap on top of the background for human segments
                     val outputBitmap = drawSegmentedBackground(segmentedBitmap, backgroundBitmap)
@@ -293,7 +304,7 @@ class FlutterRTCVirtualBackground {
         val outputStream = ByteArrayOutputStream()
         yuvImage.compressToJpeg(
             Rect(0, 0, yuvImage.width, yuvImage.height),
-            100,
+            90,
             outputStream
         )
         val jpegData = outputStream.toByteArray()
@@ -422,7 +433,7 @@ class FlutterRTCVirtualBackground {
                     var newRed: Int
                     var newGreen: Int
                     var newBlue: Int
-                    if (foregroundConfidence < expectConfidence) {
+                    if (foregroundConfidence >= expectConfidence) {
                         // Foreground uses color from the original bitmap
                         newAlpha = alpha
                         newRed = red
