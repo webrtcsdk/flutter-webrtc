@@ -63,12 +63,12 @@ apply from: 'download_models.gradle'
 dependencies {
     // implementation 'io.github.webrtc-sdk:android:114.5735.02'
     implementation 'com.twilio:audioswitch:1.1.8'
-    implementation 'androidx.annotation:annotation:1.1.0'
+    implementation 'androidx.annotation:annotation:1.6.0'
     implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk7:$kotlin_version"
     implementation files('libwebrtc.aar')
 
     // ML Kit
-    implementation 'com.google.mediapipe:tasks-vision:latest.release'
+    implementation 'com.google.mediapipe:tasks-vision:0.10.2'
 
     implementation 'com.google.android.gms:play-services-tflite-java:16.1.0'
     implementation 'com.google.android.gms:play-services-tflite-gpu:16.2.0'

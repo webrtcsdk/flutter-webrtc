@@ -1,10 +1,5 @@
 package com.cloudwebrtc.webrtc;
 
-import org.webrtc.ScreenCapturerAndroid;
-import org.webrtc.SurfaceTextureHelper;
-import org.webrtc.CapturerObserver;
-import org.webrtc.VideoFrame;
-
 import android.annotation.TargetApi;
 import android.content.Context;
 import android.content.Intent;
@@ -12,6 +7,11 @@ import android.media.projection.MediaProjection;
 import android.util.Log;
 import android.view.Surface;
 import android.view.WindowManager;
+
+import org.webrtc.CapturerObserver;
+import org.webrtc.ScreenCapturerAndroid;
+import org.webrtc.SurfaceTextureHelper;
+import org.webrtc.VideoFrame;
 
 
 /**

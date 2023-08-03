@@ -1,4 +1,4 @@
-package com.cloudwebrtc.webrtc
+package com.cloudwebrtc.webrtc;
 
 import android.content.Context
 import android.graphics.Bitmap
@@ -20,9 +20,6 @@ import com.google.android.gms.tflite.client.TfLiteInitializationOptions
 import com.google.android.gms.tflite.gpu.support.TfLiteGpu
 import com.google.android.gms.tflite.java.TfLite
 import com.google.mediapipe.tasks.vision.core.RunningMode
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 import org.webrtc.EglBase
 import org.webrtc.SurfaceTextureHelper
 import org.webrtc.TextureBufferImpl
@@ -36,28 +33,26 @@ import java.io.ByteArrayOutputStream
 import java.nio.ByteBuffer
 import java.nio.FloatBuffer
 import java.util.Arrays
+import java.util.concurrent.Executors
 import kotlin.math.max
+import kotlin.math.min
 
 class FlutterRTCVirtualBackground {
-    val TAG = FlutterWebRTCPlugin.TAG
-
-    private val scale = 0.25f
-    private val frameSizeProcessing = 225
+    private val TAG = FlutterWebRTCPlugin.TAG
+    private val frameSizeProcessing = 480
     private var videoSource: VideoSource? = null
     private var textureHelper: SurfaceTextureHelper? = null
     private var backgroundBitmap: Bitmap? = null
     private var expectConfidence = 0.7
     private var imageSegmentationHelper: ImageSegmenterHelper? = null
     private var sink: VideoSink? = null
-    private var bitmapMap = HashMap<Long, CacheFrame>()
+    private val bitmapMap = HashMap<Long, CacheFrame>()
+    private var lastProcessedFrameTime: Long = 0
+    private val targetFrameInterval: Long = 1000 / 24 // 1000 milliseconds divided by 24 FPS
 
-    // MARK: Public functions
+    // Executor for background segmentation
+    private val executor = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors())
 
-    /**
-     * Initialize the VirtualBackgroundManager with the given VideoSource.
-     *
-     * @param videoSource The VideoSource to be used for video capturing.
-     */
     fun initialize(context: Context, videoSource: VideoSource) {
         // Enable GPU
         val useGpuTask = TfLiteGpu.isGpuDelegateAvailable(context)
@@ -73,8 +68,7 @@ class FlutterRTCVirtualBackground {
         this.imageSegmentationHelper = ImageSegmenterHelper(
             context = context,
             runningMode = RunningMode.LIVE_STREAM,
-            imageSegmenterListener = object :
-                ImageSegmenterHelper.SegmenterListener {
+            imageSegmenterListener = object : ImageSegmenterHelper.SegmenterListener {
                 override fun onError(error: String, errorCode: Int) {
                     // no-op
                 }
@@ -110,7 +104,7 @@ class FlutterRTCVirtualBackground {
                     }
 
                     // Draw the segmented bitmap on top of the background for human segments
-                    val outputBitmap = drawSegmentedBackground(segmentedBitmap, backgroundBitmap)
+                    val outputBitmap = drawSegmentedBackground(segmentedBitmap, backgroundBitmap, cacheFrame.originalFrame.rotation)
 
                     // Apply a filter to reduce noise (if applicable)
                     if (outputBitmap != null) {
@@ -160,9 +154,6 @@ class FlutterRTCVirtualBackground {
         setVirtualBackground()
     }
 
-    /**
-     * Dispose of the VirtualBackgroundManager, clearing its references and configurations.
-     */
     fun dispose() {
         this.videoSource = null
         this.expectConfidence = 0.7
@@ -173,27 +164,14 @@ class FlutterRTCVirtualBackground {
         this.backgroundBitmap = null
     }
 
-    /**
-     * Configure the virtual background by setting the background bitmap and the desired confidence level.
-     *
-     * @param bgBitmap The background bitmap to be used for virtual background replacement.
-     * @param confidence The confidence level (0 to 1) for selecting the foreground in the segmentation mask.
-     */
     fun configurationVirtualBackground(bgBitmap: Bitmap, confidence: Double) {
         backgroundBitmap = bgBitmap
         expectConfidence = confidence
     }
 
-    /**
-     * Set up the virtual background processing by attaching a VideoProcessor to the VideoSource.
-     * The VideoProcessor will handle capturing video frames, performing segmentation, and replacing the background.
-     */
     private fun setVirtualBackground() {
-        // Create an instance of EglBase
         val eglBase = EglBase.create()
         textureHelper = SurfaceTextureHelper.create("SurfaceTextureThread", eglBase.eglBaseContext)
-
-        // Attach a VideoProcessor to the VideoSource to process captured video frames
         videoSource!!.setVideoProcessor(object : VideoProcessor {
             override fun onCapturerStarted(success: Boolean) {
                 // Handle video capture start event
@@ -210,12 +188,22 @@ class FlutterRTCVirtualBackground {
                         // If no background is set, pass the original frame to the sink
                         sink!!.onFrame(frame)
                     } else {
-                        // Otherwise, perform segmentation on the captured frame and replace the background
-                        val inputFrameBitmap: Bitmap? = videoFrameToBitmap(frame)
-                        if (inputFrameBitmap != null) {
-                            runSegmentationInBackground(inputFrameBitmap, frame, sink!!)
-                        } else {
-                            Log.d(TAG, "Convert video frame to bitmap failure")
+                        val currentTime = System.currentTimeMillis()
+                        val elapsedSinceLastProcessedFrame = currentTime - lastProcessedFrameTime
+
+                        // Check if the elapsed time since the last processed frame is greater than the target interval
+                        if (elapsedSinceLastProcessedFrame >= targetFrameInterval) {
+                            // Process the current frame
+                            lastProcessedFrameTime = currentTime
+
+                            // Otherwise, perform segmentation on the captured frame and replace the background
+                            val inputFrameBitmap: Bitmap? = videoFrameToBitmap(frame)
+                            if (inputFrameBitmap != null) {
+                                // Run segmentation in the background
+                                runSegmentationInBackground(inputFrameBitmap, frame, sink!!)
+                            } else {
+                                Log.d(TAG, "Convert video frame to bitmap failure")
+                            }
                         }
                     }
                 }
@@ -229,21 +217,13 @@ class FlutterRTCVirtualBackground {
         })
     }
 
-    /**
-     * Perform segmentation on the input bitmap in the background thread.
-     * After segmentation, the background is replaced with the configured virtual background.
-     *
-     * @param inputFrameBitmap The input frame bitmap to be segmented.
-     * @param frame The original VideoFrame metadata for the input bitmap.
-     * @param sink The VideoSink to send the processed frame back to WebRTC.
-     */
     @RequiresApi(Build.VERSION_CODES.N)
     private fun runSegmentationInBackground(
         inputFrameBitmap: Bitmap,
         frame: VideoFrame,
         sink: VideoSink
     ) {
-        CoroutineScope(Dispatchers.Default).launch {
+        executor.execute {
             processSegmentation(inputFrameBitmap, frame, sink)
         }
     }
@@ -304,7 +284,7 @@ class FlutterRTCVirtualBackground {
         val outputStream = ByteArrayOutputStream()
         yuvImage.compressToJpeg(
             Rect(0, 0, yuvImage.width, yuvImage.height),
-            90,
+            85,
             outputStream
         )
         val jpegData = outputStream.toByteArray()
@@ -331,13 +311,6 @@ class FlutterRTCVirtualBackground {
         bitmapMap[frameTime] = CacheFrame(originalBitmap = resizeBitmap, originalFrame = original)
 
         imageSegmentationHelper?.segmentLiveStreamFrame(resizeBitmap, frameTime)
-    }
-
-    private fun resizeBitmap(bitmap: Bitmap, scaleFactory: Float): Bitmap {
-        val newWidth = (bitmap.width * scaleFactory).toInt()
-        val newHeight = (bitmap.height * scaleFactory).toInt()
-
-        return Bitmap.createScaledBitmap(bitmap, newWidth, newHeight, false)
     }
 
     /**
@@ -461,37 +434,39 @@ class FlutterRTCVirtualBackground {
     }
 
     /**
-     * Draws the segmentedBitmap on top of the backgroundBitmap with the background resized and centered
-     * to fit the dimensions of the segmentedBitmap. The output is a new bitmap containing the combined
-     * result.
+     * Draw the segmentedBitmap on top of the backgroundBitmap with the background rotated by the specified angle (in degrees)
+     * and both background and segmentedBitmap flipped vertically to match the same orientation.
      *
      * @param segmentedBitmap The bitmap representing the segmented foreground with transparency.
      * @param backgroundBitmap The bitmap representing the background image to be used as the base.
-     * @return The resulting bitmap with the segmented foreground overlaid on the background.
+     * @param rotationAngle The angle in degrees to rotate both the backgroundBitmap and segmentedBitmap.
+     * @return The resulting bitmap with the segmented foreground overlaid on the rotated and vertically flipped background.
      *         Returns null if either of the input bitmaps is null.
      */
     private fun drawSegmentedBackground(
         segmentedBitmap: Bitmap?,
-        backgroundBitmap: Bitmap?
+        backgroundBitmap: Bitmap?,
+        rotationAngle: Int
     ): Bitmap? {
         if (segmentedBitmap == null || backgroundBitmap == null) {
             // Handle invalid bitmaps
             return null
         }
 
-        val segmentedWidth = segmentedBitmap.width
-        val segmentedHeight = segmentedBitmap.height
-
         // Create a new bitmap with dimensions matching the segmentedBitmap
-        val outputBitmap =
-            Bitmap.createBitmap(segmentedWidth, segmentedHeight, Bitmap.Config.ARGB_8888)
-
-        // Create a canvas to draw on the outputBitmap
+        val outputBitmap = Bitmap.createBitmap(
+            segmentedBitmap.width,
+            segmentedBitmap.height,
+            Bitmap.Config.ARGB_8888
+        )
         val canvas = Canvas(outputBitmap)
 
+        // Create a matrix to apply transformations to the background and segmentedBitmap
+        val matrix = Matrix()
+
         // Calculate the scale factor for the backgroundBitmap to be larger or equal to the segmentedBitmap
-        val scaleX = segmentedWidth.toFloat() / backgroundBitmap.width
-        val scaleY = segmentedHeight.toFloat() / backgroundBitmap.height
+        val scaleX = segmentedBitmap.width.toFloat() / backgroundBitmap.width
+        val scaleY = segmentedBitmap.height.toFloat() / backgroundBitmap.height
         val scale = max(scaleX, scaleY)
 
         // Calculate the new dimensions of the backgroundBitmap after scaling
@@ -499,87 +474,23 @@ class FlutterRTCVirtualBackground {
         val newBackgroundHeight = (backgroundBitmap.height * scale).toInt()
 
         // Calculate the offset to center the backgroundBitmap in the outputBitmap
-        val offsetX = (segmentedWidth - newBackgroundWidth) / 2
-        val offsetY = (segmentedHeight - newBackgroundHeight) / 2
+        val offsetX = (segmentedBitmap.width - newBackgroundWidth) / 2
+        val offsetY = (segmentedBitmap.height - newBackgroundHeight) / 2
 
-        // Create a transformation matrix to scale and center the backgroundBitmap
-        val matrix = Matrix()
+        // Apply scale and translate to center the backgroundBitmap and segmentedBitmap
         matrix.postScale(scale, scale)
         matrix.postTranslate(offsetX.toFloat(), offsetY.toFloat())
 
-        // Draw the backgroundBitmap on the canvas with the specified scale and centering
+        // Rotate the backgroundBitmap and segmentedBitmap by the specified angle around the center of the image
+        matrix.postRotate(rotationAngle.toFloat(), segmentedBitmap.width / 2f, segmentedBitmap.height / 2f)
+
+        // Draw the backgroundBitmap on the canvas with the specified transformations
         canvas.drawBitmap(backgroundBitmap, matrix, null)
 
-        // Draw the segmentedBitmap on the canvas
-        canvas.drawBitmap(segmentedBitmap, 0f, 0f, null)
+        // Draw the segmentedBitmap on the canvas with the same transformations
+        canvas.drawBitmap(segmentedBitmap, matrix, null)
 
         return outputBitmap
-    }
-
-    /**
-     * Apply Mean Filter to the given bitmap with the specified kernel size.
-     * The Mean Filter is a simple image processing filter that smoothens the image by
-     * replacing each pixel value with the average value of its neighboring pixels.
-     *
-     * @param bitmap The bitmap to be processed.
-     * @param kernelSize The size of the square kernel (odd number) for the filter. For example, 3, 5, 7, etc.
-     * @return The bitmap after applying the Mean Filter.
-     */
-    fun meanFilter(bitmap: Bitmap, kernelSize: Int): Bitmap {
-        val width = bitmap.width
-        val height = bitmap.height
-
-        // Create a new output bitmap with the same dimensions as the input bitmap
-        val outputBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-
-        // Loop through each pixel in the bitmap and apply the Mean Filter
-        for (x in 0 until width) {
-            for (y in 0 until height) {
-                // Collect pixel values within the kernel
-                val kernelPixels = mutableListOf<Int>()
-                for (i in -kernelSize / 2..kernelSize / 2) {
-                    for (j in -kernelSize / 2..kernelSize / 2) {
-                        val pixelX = x + i
-                        val pixelY = y + j
-                        if (pixelX in 0 until width && pixelY in 0 until height) {
-                            kernelPixels.add(bitmap.getPixel(pixelX, pixelY))
-                        }
-                    }
-                }
-
-                // Calculate the average value of the pixels in the kernel
-                val avgColor = calculateAverageColor(kernelPixels)
-
-                // Set the average color as the new color of the pixel in the output bitmap
-                outputBitmap.setPixel(x, y, avgColor)
-            }
-        }
-
-        return outputBitmap
-    }
-
-    /**
-     * Calculate the average color from the given list of pixel colors.
-     *
-     * @param colors The list of pixel colors.
-     * @return The average color calculated from the list of pixel colors.
-     */
-    private fun calculateAverageColor(colors: List<Int>): Int {
-        var sumRed = 0
-        var sumGreen = 0
-        var sumBlue = 0
-
-        for (color in colors) {
-            sumRed += color shr 16 and 0xFF
-            sumGreen += color shr 8 and 0xFF
-            sumBlue += color and 0xFF
-        }
-
-        val avgRed = sumRed / colors.size
-        val avgGreen = sumGreen / colors.size
-        val avgBlue = sumBlue / colors.size
-
-        return (avgRed shl 16) or (avgGreen shl 8) or avgBlue or (0xFF shl 24)
     }
 
     /**
