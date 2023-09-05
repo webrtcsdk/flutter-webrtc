@@ -2,7 +2,6 @@ import 'package:flutter/foundation.dart';
 
 import '../flutter_webrtc.dart';
 import 'native/audio_management.dart';
-import 'native/ios/audio_configuration.dart';
 
 class Helper {
   static Future<List<MediaDeviceInfo>> enumerateDevices(String type) async {
@@ -68,6 +67,18 @@ class Helper {
     return Future.value(true);
   }
 
+  static Future<void> setZoom(
+      MediaStreamTrack videoTrack, double zoomLevel) async {
+    if (WebRTC.platformIsAndroid || WebRTC.platformIsIOS) {
+      await WebRTC.invokeMethod(
+        'mediaStreamTrackSetZoom',
+        <String, dynamic>{'trackId': videoTrack.id, 'zoomLevel': zoomLevel},
+      );
+    } else {
+      throw Exception('setZoom only support for mobile devices!');
+    }
+  }
+
   /// Used to select a specific audio output device.
   ///
   /// Note: This method is only used for Flutter native,
@@ -89,7 +100,7 @@ class Helper {
   static Future<void> selectAudioInput(String deviceId) =>
       NativeAudioManagement.selectAudioInput(deviceId);
 
-  /// Set microphone mute/unmute for Flutter native.
+  /// Enable or disable speakerphone
   /// for iOS/Android only
   static Future<void> setSpeakerphoneOn(bool enable) =>
       NativeAudioManagement.setSpeakerphoneOn(enable);
@@ -121,6 +132,18 @@ class Helper {
   /// Set the microphone mute/unmute for Flutter native
   static Future<void> setMicrophoneMute(bool mute, MediaStreamTrack track) =>
       NativeAudioManagement.setMicrophoneMute(mute, track);
+
+  /// Set the audio configuration to for Android.
+  /// Must be set before initiating a WebRTC session and cannot be changed
+  /// mid session.
+  static Future<void> setAndroidAudioConfiguration(
+          AndroidAudioConfiguration androidAudioConfiguration) =>
+      AndroidNativeAudioManagement.setAndroidAudioConfiguration(
+          androidAudioConfiguration);
+
+  /// After Android app finishes a session, on audio focus loss, clear the active communication device.
+  static Future<void> clearAndroidCommunicationDevice() =>
+      WebRTC.invokeMethod('clearAndroidCommunicationDevice');
 
   /// Set the audio configuration for iOS
   static Future<void> setAppleAudioConfiguration(

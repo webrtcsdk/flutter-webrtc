@@ -803,6 +803,24 @@ static NSString *sharedPeerConnectionId;
                                    details:nil]);
       }
     }
+  } else if ([@"mediaStreamTrackSetZoom" isEqualToString:call.method]) {
+    NSDictionary* argsMap = call.arguments;
+    NSString* trackId = argsMap[@"trackId"];
+    double zoomLevel = [argsMap[@"zoomLevel"] doubleValue];
+    RTCMediaStreamTrack* track = self.localTracks[trackId];
+    if (track != nil && [track isKindOfClass:[RTCVideoTrack class]]) {
+      RTCVideoTrack* videoTrack = (RTCVideoTrack*)track;
+      [self mediaStreamTrackSetZoom:videoTrack zoomLevel:zoomLevel result:result];
+    } else {
+      if (track == nil) {
+        result([FlutterError errorWithCode:@"Track is nil" message:nil details:nil]);
+      } else {
+        result([FlutterError errorWithCode:[@"Track is class of "
+                                               stringByAppendingString:[[track class] description]]
+                                   message:nil
+                                   details:nil]);
+      }
+    }
   } else if ([@"mediaStreamTrackSwitchCamera" isEqualToString:call.method]) {
     NSDictionary* argsMap = call.arguments;
     NSString* trackId = argsMap[@"trackId"];
@@ -1277,6 +1295,54 @@ static NSString *sharedPeerConnectionId;
   } else if ([@"getRtpSenderCapabilities" isEqualToString:call.method]) {
     NSDictionary* argsMap = call.arguments;
     [self peerConnectionGetRtpSenderCapabilities:argsMap result:result];
+  } else if ([@"getSignalingState" isEqualToString:call.method]) {
+    NSDictionary* argsMap = call.arguments;
+    NSString* peerConnectionId = argsMap[@"peerConnectionId"];
+    RTCPeerConnection* peerConnection = self.peerConnections[peerConnectionId];
+    if (peerConnection) {
+      result(@{@"state" : [self stringForSignalingState:peerConnection.signalingState]});
+    } else {
+      result([FlutterError
+          errorWithCode:[NSString stringWithFormat:@"%@Failed", call.method]
+                message:[NSString stringWithFormat:@"Error: peerConnection not found!"]
+                details:nil]);
+    }
+  } else if ([@"getIceGatheringState" isEqualToString:call.method]) {
+    NSDictionary* argsMap = call.arguments;
+    NSString* peerConnectionId = argsMap[@"peerConnectionId"];
+    RTCPeerConnection* peerConnection = self.peerConnections[peerConnectionId];
+    if (peerConnection) {
+      result(@{@"state" : [self stringForICEGatheringState:peerConnection.iceGatheringState]});
+    } else {
+      result([FlutterError
+          errorWithCode:[NSString stringWithFormat:@"%@Failed", call.method]
+                message:[NSString stringWithFormat:@"Error: peerConnection not found!"]
+                details:nil]);
+    }
+  } else if ([@"getIceConnectionState" isEqualToString:call.method]) {
+    NSDictionary* argsMap = call.arguments;
+    NSString* peerConnectionId = argsMap[@"peerConnectionId"];
+    RTCPeerConnection* peerConnection = self.peerConnections[peerConnectionId];
+    if (peerConnection) {
+      result(@{@"state" : [self stringForICEConnectionState:peerConnection.iceConnectionState]});
+    } else {
+      result([FlutterError
+          errorWithCode:[NSString stringWithFormat:@"%@Failed", call.method]
+                message:[NSString stringWithFormat:@"Error: peerConnection not found!"]
+                details:nil]);
+    }
+  } else if ([@"getConnectionState" isEqualToString:call.method]) {
+    NSDictionary* argsMap = call.arguments;
+    NSString* peerConnectionId = argsMap[@"peerConnectionId"];
+    RTCPeerConnection* peerConnection = self.peerConnections[peerConnectionId];
+    if (peerConnection) {
+      result(@{@"state" : [self stringForPeerConnectionState:peerConnection.connectionState]});
+    } else {
+      result([FlutterError
+          errorWithCode:[NSString stringWithFormat:@"%@Failed", call.method]
+                message:[NSString stringWithFormat:@"Error: peerConnection not found!"]
+                details:nil]);
+    }
   } else {
     [self handleFrameCryptorMethodCall:call result:result];
   }
