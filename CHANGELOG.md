@@ -1,6 +1,36 @@
 # Changelog
 
 --------------------------------------------
+[0.9.45] - 2023-09-27
+
+* [iOS/macOS] fix: send message on non-platform thread.
+* [Windows] fix: fix setSrcObj with trackId for Windows.
+* [Windows] fix: fix "unlock of unowned mutex" error when call "captureFrame()" func on windows.
+
+[0.9.44] - 2023-09-25
+
+* [Windows] fix: fix Renderer bug for Windows.
+* [Native] fix: Use independent threads to process frame encryption/decryption
+* [Native] fix: Correct handle SIF frame
+* [Native] fix: Fix a fault tolerance judgment failure
+
+[0.9.43] - 2023-09-20
+
+* [Native] fix: send frame cryptor events from signaling thread.
+* [Native] fix: h264 freeze when using E2EE.
+
+[0.9.42+hotfix.1] - 2023-09-15
+
+* [Windows/Linux] fix: fix cannot start vp8/h264 encoder correctly.
+
+[0.9.42] - 2023-09-15
+
+* [Dart/Native] feat: add more framcryptor api (#1444)
+* [Dart/Native] feat: support scalability mode (#1442)
+* [Android] fix: Turn off audio routing in non communication modes (#1438)
+
+* [Android] feat: Add more control over android audio options.
+
 [0.9.41] - 2023-08-30
 
 * [Android] feat: Add more control over android audio options.
